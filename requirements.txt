@@ -1,0 +1,10 @@
+# Required modules for the project to run
+# pip install -r requirements.txt
+
+ipykernel
+numpy
+pandas
+xgboost
+scikit-learn==1.5.2
+joblib
+matplotlib
