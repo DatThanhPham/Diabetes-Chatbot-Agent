@@ -1,0 +1,47 @@
+@startuml Technology
+!startsub Technology
+entity User {
+  -id : ObjectId <<generated>>
+  --
+  ~createdBy: ObjectId
+  ~updatedBy: ObjectId
+  --
+  *name: string
+  dob: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+entity HealthIndex {
+    -id : ObjectId <<generated>>
+    --
+    highBp: interger
+    highChol: int
+    cholCheck: int 
+    weight: int 
+    height: int 
+    Smoker: int
+    stroke: int 
+    heartDiseaseOrAttack: int 
+    physActivity: int 
+    HvyAlcoholConsump: int 
+    AnyHealthcare: int 
+    NoDocbcCost: int
+    GenHlth: int	
+    MentHlth: int	
+    PhysHlth: int
+    DiffWalkL: int 	
+    Sex: int
+    Age: int
+    Education: int	
+    Income: int
+}
+
+entity Message {
+    -id : ObjectId <<generated>>
+    --
+    createdAt: Date
+    updatedAt: Date
+}
+!endsub
+@enduml
