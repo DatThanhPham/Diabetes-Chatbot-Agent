@@ -25,10 +25,3 @@ python run.py
 cd ../frontend
 streamlit run app.py
 ```
-
-## 5. Run mock model server (if needed)
-```bash
-cd ../mock-model-service
-python app.py
-```
-

@@ -3,6 +3,7 @@ from app.validation import validate_health_form
 import requests
 import google.generativeai as genai
 import os
+from app.predict_model import predictor
 
 bp = Blueprint('routes', __name__)
 
@@ -62,32 +63,41 @@ def build_profile_text(record):
     - Giới tính: {'Nam' if data.get('Sex')==1 else 'Nữ'}
     """
 
-
-@bp.route('/predict', methods=['POST'])
-def predict_and_advise():
-    # 1. Validate Form
+@bp.route('/analyze_risk', methods=['POST'])
+def analyze_risk():
     form_data = request.get_json()
-    is_valid, result = validate_health_form(form_data)
     
+    # 1. Validate
+    is_valid, result = validate_health_form(form_data)
     if not is_valid:
         return jsonify({"error": result}), 400
     
     validated_data = result
 
-    # 2. Gọi Model Dự đoán (Giả lập)
+    # 2. Gọi Model XGBoost (Local)
     try:
-        model_api_url = current_app.config['MOCK_MODEL_URL']
-        model_response = requests.post(model_api_url, json=validated_data)
-        model_response.raise_for_status()
-        # === THAY ĐỔI LOGIC: Mong đợi 0 hoặc 1 ===
-        prediction = model_response.json().get('prediction') 
-    except requests.exceptions.RequestException as e:
-        current_app.logger.error(f"Không thể gọi Model dự đoán: {e}")
-        return jsonify({"error": "Không thể kết nối đến máy chủ dự đoán."}), 503
-    
-    # Model phải trả về 0 (Không) hoặc 1 (Có)
-    if prediction not in [0, 1]:
-        return jsonify({"error": "Model dự đoán trả về kết quả không hợp lệ (phải là 0 hoặc 1)."}), 500
+        prediction = predictor.predict(validated_data)
+        if prediction is None: raise Exception("Model trả về None")
+        print(f"Dự đoán nguy cơ: {prediction}")
+    except Exception as e:
+        current_app.logger.error(f"Lỗi Model: {e}")
+        return jsonify({"error": "Lỗi mô hình dự đoán."}), 500
+
+    # Trả về kết quả ngay lập tức để Frontend hiển thị
+    return jsonify({
+        "prediction": int(prediction),
+        "validated_data": validated_data # Gửi lại cái này để dùng cho bước 2
+    }), 200
+
+@bp.route('/get_advice', methods=['POST'])
+def predict_and_advise():
+
+    data = request.get_json()
+    validated_data = data.get('validated_data')
+    prediction = data.get('prediction')
+
+    if validated_data is None or prediction is None:
+        return jsonify({"error": "Thiếu dữ liệu đầu vào"}), 400
 
     # 3. Gọi AI Agent (Gemini RAG)
     profile_txt = build_profile_text({'form_data': validated_data, 'prediction': prediction})
