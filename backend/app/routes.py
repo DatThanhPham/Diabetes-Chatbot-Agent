@@ -6,60 +6,62 @@ import os
 
 bp = Blueprint('routes', __name__)
 
-def load_knowledge_base():
-    """Tải file kiến thức RAG"""
+def get_rag_content():
+    """Lấy danh sách File Reference từ ID đã cấu hình"""
+    file_ids_str = current_app.config.get('KNOWLEDGE_FILE_IDS')
+    if not file_ids_str:
+        return []
+    
+    # Tách chuỗi ID thành list và lấy reference
+    file_id_list = [fid.strip() for fid in file_ids_str.split(',') if fid.strip()]
     try:
-        kb_path = os.path.join(os.path.dirname(__file__), 'knowledge.md')
-        with open(kb_path, 'r', encoding='utf-8') as f:
-            return f.read()
+        return [genai.get_file(fid) for fid in file_id_list]
     except Exception as e:
-        current_app.logger.error(f"Không thể tải knowledge.md: {e}")
-        return "Lỗi: Không thể tải cơ sở tri thức."
+        current_app.logger.error(f"Lỗi lấy file từ Google: {e}")
+        return []
 
-def get_ai_agent_advice(prediction, user_data, knowledge_base):
-    """
-    Gọi Gemini API (RAG) để sinh lời khuyên (Chỉ 0 hoặc 1)
-    """
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    
-    # === THAY ĐỔI LOGIC: CHỈ CÓ 0 HOẶC 1 ===
-    if prediction == 1:
-        prediction_text = "1 (Có nguy cơ mắc Tiểu đường)"
-    else:
-        prediction_text = "0 (Không có nguy cơ)"
-
-    # Tạo tóm tắt hồ sơ
-    profile_summary = []
-    if user_data['HighBP'] == 1: profile_summary.append("Bị cao huyết áp")
-    if user_data['BMI'] >= 25: profile_summary.append(f"BMI {user_data['BMI']} (Thừa cân/Béo phì)")
-    if user_data['Smoker'] == 1: profile_summary.append("Có hút thuốc")
-    if user_data['PhysActivity'] == 0: profile_summary.append("Không hoạt động thể chất")
-    if user_data['GenHlth'] >= 4: profile_summary.append("Sức khỏe chung Trung bình/Kém")
-    
-    profile_text = ", ".join(profile_summary) if profile_summary else "Không có yếu tố rủi ro nổi bật."
-
-    prompt = f"""
-    {knowledge_base}
-    ---
-    **YÊU CẦU:**
-    Bạn là một trợ lý y tế AI. Dựa **TUYỆT ĐỐI** vào CƠ SỞ TRI THỨC Y TẾ bên trên:
-    
-    1.  Tìm kịch bản phù hợp (0 hoặc 1).
-    2.  Trích xuất lời khuyên chung (bắt buộc) cho kịch bản đó.
-    3.  Xem xét các yếu tố cá nhân hóa và chỉ chọn những lời khuyên cá nhân hóa có liên quan.
-    4.  Trình bày lời khuyên một cách rõ ràng, "uy tín", và nhấn mạnh việc đi gặp bác sĩ nếu kết quả là 1.
-
-    **Thông tin người dùng:**
-    * **Kết quả dự đoán từ Model:** {prediction_text}
-    * **Hồ sơ yếu tố rủi ro:** {profile_text}
-    """
-    
+def generate_response_with_files(prompt_text):
+    """Gọi Gemini với Prompt và Danh sách File"""
     try:
-        response = model.generate_content(prompt)
+        rag_files = get_rag_content()
+        if not rag_files:
+            return "Hệ thống chưa tải được tài liệu kiến thức. Vui lòng kiểm tra cấu hình."
+
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        # Gửi Prompt + Tất cả File
+        content_to_send = [prompt_text] + rag_files
+        response = model.generate_content(content_to_send)
         return response.text
     except Exception as e:
-        current_app.logger.error(f"Lỗi khi gọi Gemini API: {e}")
-        return "Đã có lỗi xảy ra khi phân tích kết quả. Vui lòng thử lại."
+        current_app.logger.error(f"Lỗi Gemini: {e}")
+        return "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau."
+    
+def build_profile_text(record):
+    """Tạo tóm tắt hồ sơ người dùng để AI nhớ ngữ cảnh"""
+    if not record: return "Chưa có hồ sơ sức khỏe."
+    
+    data = record.get('form_data', {})
+    pred = record.get('prediction')
+    
+    # Logic dự đoán 0/1
+    pred_text = "Nguy cơ CAO (Có khả năng tiểu đường)" if pred == 1 else "Nguy cơ THẤP (An toàn)"
+    
+    factors = []
+    if data.get('HighBP') == 1: factors.append("Cao huyết áp")
+    if data.get('BMI', 0) >= 25: factors.append(f"BMI {data['BMI']} (Thừa cân)")
+    if data.get('Smoker') == 1: factors.append("Hút thuốc")
+    if data.get('PhysActivity') == 0: factors.append("Lười vận động")
+    
+    risk_text = ", ".join(factors) if factors else "Không có yếu tố rủi ro lớn"
+    
+    return f"""
+    - Tình trạng dự đoán: {pred_text}
+    - Các yếu tố rủi ro chính: {risk_text}
+    - Nhóm tuổi: {data.get('Age')}
+    - Giới tính: {'Nam' if data.get('Sex')==1 else 'Nữ'}
+    """
+
 
 @bp.route('/predict', methods=['POST'])
 def predict_and_advise():
@@ -88,8 +90,21 @@ def predict_and_advise():
         return jsonify({"error": "Model dự đoán trả về kết quả không hợp lệ (phải là 0 hoặc 1)."}), 500
 
     # 3. Gọi AI Agent (Gemini RAG)
-    knowledge_base = load_knowledge_base()
-    advice = get_ai_agent_advice(prediction, validated_data, knowledge_base)
+    profile_txt = build_profile_text({'form_data': validated_data, 'prediction': prediction})
+    
+    prompt = f"""
+    Bạn là bác sĩ tư vấn AI chuyên về bệnh tiểu đường.
+    Dựa CHÍNH XÁC vào các tài liệu đính kèm, hãy đưa ra lời khuyên ban đầu cho bệnh nhân này:
+    {profile_txt}
+    
+    Yêu cầu:
+    1. Thông báo kết quả dự đoán một cách cảm thông.
+    2. Giải thích ngắn gọn về các yếu tố rủi ro liên quan.
+    3. Đưa ra 3 hành động cụ thể cần làm ngay (dựa trên tài liệu).
+    4. Gợi ý cách hoạt động thể chất và chế độ ăn uống phù hợp.
+    5. Nhấn mạnh việc đi khám bác sĩ nếu nguy cơ cao.
+    """
+    advice = generate_response_with_files(prompt)
 
     # 4. Trả lời khuyên về Frontend
     return jsonify({"advice": advice}), 200

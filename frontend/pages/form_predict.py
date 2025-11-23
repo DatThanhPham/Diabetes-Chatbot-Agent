@@ -37,7 +37,8 @@ def display_health_form():
             high_bp = st.radio("Bạn có bị cao huyết áp không?", ("Không", "Có"), horizontal=True)
             high_chol = st.radio("Cholesterol của bạn có cao không?", ("Không", "Có"), horizontal=True)
             chol_check = st.radio("Bạn có kiểm tra Cholesterol trong 5 năm qua?", ("Có", "Không"), horizontal=True)
-            bmi = st.number_input("Chỉ số BMI của bạn (ví dụ: 22.5)", min_value=12.0, max_value=99.0, value=25.0, step=0.1)
+            weight = st.number_input("Cân nặng của bạn (kg)", min_value=30.0, max_value=300.0, value=70.0, step=0.1)
+            height = st.number_input("Chiều cao của bạn (cm)", min_value=100.0, max_value=250.0, value=170.0, step=0.1)
         with col2:
             smoker = st.radio("Bạn có hút ít nhất 100 điếu thuốc trong đời?", ("Không", "Có"), horizontal=True)
             stroke = st.radio("Bạn đã từng bị đột quỵ?", ("Không", "Có"), horizontal=True)
@@ -69,7 +70,7 @@ def display_health_form():
             no_doc_cost = st.radio("Trong 12 tháng qua, có lúc nào bạn không thể đi khám bác sĩ vì chi phí?", ("Không", "Có"), horizontal=True)
         with col8:
             sex = st.radio("Giới tính của bạn?", ("Nữ", "Nam"), horizontal=True)
-            age = st.select_slider("Nhóm tuổi của bạn?", options=age_map.keys())
+            age = st.number_input("Nhập số tuổi của bạn:", min_value=18, max_value=120, value=30, step=1)
 
         st.markdown("---")
         st.markdown("### V. Học vấn & Thu nhập")
@@ -87,7 +88,7 @@ def display_health_form():
                 "HighBP": yes_no_map[high_bp],
                 "HighChol": yes_no_map[high_chol],
                 "CholCheck": yes_no_map[chol_check],
-                "BMI": bmi,
+                "BMI": round(weight / ((height / 100) ** 2), 1),
                 "Smoker": yes_no_map[smoker],
                 "Stroke": yes_no_map[stroke],
                 "HeartDiseaseorAttack": yes_no_map[heart_disease],
@@ -100,7 +101,7 @@ def display_health_form():
                 "PhysHlth": float(phys_hlth),
                 "DiffWalk": yes_no_map[diff_walk],
                 "Sex": sex_map[sex],
-                "Age": age_map[age],
+                "Age": age_map[next(key for key, value in age_map.items() if int(key.split('-')[0]) <= age <= (int(key.split('-')[1]) if '+' not in key else 120))],
                 "Education": edu_map[education],
                 "Income": income_map[income]
             }
@@ -122,12 +123,10 @@ def display_health_form():
                     st.error(f"Đã xảy ra lỗi: {e}")
 
 def main():
-    # Kiểm tra login trước khi cho dự đoán
-    if "user" not in st.session_state or st.session_state.user is None:
-        st.warning("Vui lòng đăng nhập để sử dụng chức năng này.")
-        st.stop()
-
+    st.set_page_config(page_title="Chatbot Sức khỏe", layout="wide")
+    
     display_health_form()
+
 
 if __name__ == "__main__":
     main()
