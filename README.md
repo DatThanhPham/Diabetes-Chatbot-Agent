@@ -28,7 +28,7 @@ streamlit run app.py
 
 ## 5. Run mock model server (if needed)
 ```bash
-cd ../mock_model
-python mock_model.py
+cd ../mock-model-service
+python app.py
 ```
 
