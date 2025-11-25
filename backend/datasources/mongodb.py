@@ -1,13 +1,11 @@
 import os
 from urllib.parse import quote_plus
-
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DOTENV_PATH = os.path.join(BASE_DIR, ".env")
 load_dotenv(DOTENV_PATH)
-
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -31,7 +29,14 @@ db = client[DB_NAME]
 def get_user_collection():
     return db['USER']
 
-# test nhanh
+def get_assessment_collection():
+    return db["ASSESSMENT"]
+
+
+def get_message_collection():
+    return db["MESSAGE"]
+
+# test
 if __name__ == "__main__":
     print("Database:", db.name)
     print("Collections:", db.list_collection_names())

@@ -28,6 +28,6 @@ def sign_in(username: str, password: str) -> bool:
             
 
 if __name__ == "__main__":
-    # signup("letandat15082002","123123")
-    # print(get_user_by_username("letandat15082002"))
-    print(sign_in("letandat15082002", "123123"))
+    # signup("letandat1508","123123")
+    # print(get_user_by_username("letandat1508"))
+    print(sign_in("letandat1508", "123123"))

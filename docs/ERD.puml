@@ -1,47 +1,68 @@
-@startuml Technology
-!startsub Technology
-entity User {
-  -id : ObjectId <<generated>>
+@startuml
+hide circle
+hide methods
+hide stereotypes
+
+' ==============
+' ENTITIES
+' ==============
+
+entity "User" as User {
+  * _id: ObjectId
   --
-  ~createdBy: ObjectId
-  ~updatedBy: ObjectId
-  --
-  *name: string
-  dob: string
-  createdAt: Date
-  updatedAt: Date
+  name: string
+  hashed_password
+  created_at: datetime
 }
 
-entity HealthIndex {
-    -id : ObjectId <<generated>>
-    --
-    highBp: interger
-    highChol: int
-    cholCheck: int 
-    weight: int 
-    height: int 
-    Smoker: int
-    stroke: int 
-    heartDiseaseOrAttack: int 
-    physActivity: int 
-    HvyAlcoholConsump: int 
-    AnyHealthcare: int 
-    NoDocbcCost: int
-    GenHlth: int	
-    MentHlth: int	
-    PhysHlth: int
-    DiffWalkL: int 	
-    Sex: int
-    Age: int
-    Education: int	
-    Income: int
+entity "Assessment" as Assessment {
+  * _id: ObjectId
+  --
+  user_id: ObjectId  ' FK -> User._id
+  measured_at: datetime ' thời điểm chỉ số đại diện
+  created_at: datetime
+  is_valid: bool  ' 
+  --
+  metrics: document  ' { bmi, fasting_glucose, hba1c, ... }
+  prediction: document  ' { risk_score, risk_level, model_version, ... }
 }
 
-entity Message {
-    -id : ObjectId <<generated>>
-    --
-    createdAt: Date
-    updatedAt: Date
+entity "Message" as Message {
+  * _id: ObjectId
+  --
+  assessment_id: ObjectId? ' optional: message nói về assessment nào
+  sender_type: string' user | agent
+  content: string
+  created_at: datetime
+  metadata: document
 }
-!endsub
+
+' ==============
+' RELATIONSHIPS + CARDINALITY
+' ==============
+
+
+' 1 User có 0..* Assessment
+User "1" -- "n" Assessment : has
+
+' 1 User có 0..* Assessment
+User "1" -- "n" Message : has
+
+' 1 Assessment có 0..* ChatMessage (các tin nhắn giải thích / tư vấn về lần đo đó)
+Assessment "1" -- "n" Message : explained in
+
+' ==============
+' BUSINESS RULE
+' ==============
+
+note right of Assessment
+  Rule 2 tuần:
+  - có thể có nhiều assessment tồn tại theo thời gian
+  - chỉ duy nhất 1 assessment có hiệu lực tại 1 thời điểm
+  - is_valid = True cho đến khi có 1 assessment mới được thêm vào
+  - Khi user vào chat:
+    * lấy Assessment mới nhất type = "diabetes_risk"
+    * nếu is_valid >= true -> dùng để tư vấn
+end note
+
 @enduml
