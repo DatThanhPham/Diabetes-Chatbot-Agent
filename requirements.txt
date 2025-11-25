@@ -8,3 +8,16 @@ xgboost
 scikit-learn==1.5.2
 joblib
 matplotlib
+tabulate
+imbalanced-learn
+mlxtend
+# --- Backend (Flask) ---
+Flask
+python-dotenv
+
+# --- Frontend (Streamlit) ---
+streamlit
+
+# --- Shared Libraries ---
+requests
+google-generativeai
