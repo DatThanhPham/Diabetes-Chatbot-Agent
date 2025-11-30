@@ -110,7 +110,7 @@ def predict_and_advise():
     Yêu cầu:
     1. Thông báo kết quả dự đoán một cách cảm thông.
     2. Giải thích ngắn gọn về các yếu tố rủi ro liên quan.
-    3. Đưa ra 3 hành động cụ thể cần làm ngay (dựa trên tài liệu).
+    3. Đưa ra 3 hành động cụ thể cần làm ngay.
     4. Gợi ý cách hoạt động thể chất và chế độ ăn uống phù hợp.
     5. Nhấn mạnh việc đi khám bác sĩ nếu nguy cơ cao.
     """

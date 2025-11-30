@@ -27,7 +27,7 @@ class DiabetesPredictor:
     def load_resources(self):
         try:
             print("⏳ Đang tải model XGBoost và bộ xử lý...")
-            self.model = joblib.load(os.path.join(MODEL_DIR, 'xgboost_model.bin'))
+            self.model = joblib.load(os.path.join(MODEL_DIR, 'stacking_ensemble_model.bin'))
             self.encoders = joblib.load(os.path.join(MODEL_DIR, 'label_encoders.bin'))
             self.scaler = joblib.load(os.path.join(MODEL_DIR, 'scaler.bin'))
             self.is_loaded = True

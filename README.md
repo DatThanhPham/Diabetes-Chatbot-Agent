@@ -13,14 +13,21 @@ Create a `.env` file in the root directory of the project based on the provided 
 cp .env.sample .env
 ```
 
-## 3. Run backend server
+## 3. Upload knowledge files
+```bash
+cd backend
+python upload_knowledge_files.py
+```
+Copy the generated file IDs and update the `KNOWLEDGE_FILE_IDS` variable in the `.env` file.
+
+## 4. Run backend server
 
 ```bash
 cd backend
 python run.py
 ```
 
-## 4. Run frontend application
+## 5. Run frontend application
 ```bash
 cd ../frontend
 streamlit run app.py
