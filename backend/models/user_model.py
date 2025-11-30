@@ -1,36 +1,36 @@
 from datetime import datetime
-from typing import Optional, Dict, Any, List
-from pydantic import Field
-from .common import MongoBaseModel, PyObjectId
+import hashlib
 
-# def make_user_doc(username: str, hashed_password: str, email: str | None = None):
-#     return {
-#         "username": username,
-#         "hashed_password": hashed_password,
-#         "created_at": datetime.now(),
-#     }
+def hash_password(password: str) -> str:
+    """Hash password using SHA-256"""
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
-# def parse_user_doc(doc: dict) -> dict:
-#     if not doc:
-#         return None
+def make_user_doc(name: str, password: str) -> dict:
+    """Create user document for MongoDB
+    
+    Args:
+        name: Username
+        password: Plain password
+    
+    Returns:
+        MongoDB document
+    """
+    return {
+        "name": name,
+        "hashed_password": hash_password(password),
+        "created_at": datetime.utcnow()
+    }
 
-#     return {
-#         "id": str(doc.get("_id")),
-#         "username": doc.get("username"),
-#         "hashed_password": doc.get("hashed_password"),
-#         "created_at": doc.get("created_at"),
-#     }
+def parse_user_doc(doc: dict) -> dict:
+    """Parse MongoDB user document to dict"""
+    if not doc:
+        return None
+    return {
+        "id": str(doc["_id"]),
+        "name": doc["name"],
+        "created_at": doc.get("created_at").isoformat() if doc.get("created_at") else None
+    }
 
-class User(MongoBaseModel):
-    id: Optional[PyObjectId] = Field(alias="_id", default=None)
-    username: str
-    hashed_password: str
-    created_at: datetime = Field(default_factory=datetime.now)
-
-    def parse(self) -> Dict[str, Any]:
-        return {
-            "id": str(self.id),
-            "username": self.username,
-            "hashed_password": self.hashed_password,
-            "created_at": self.created_at,
-        }
+def verify_password(password: str, hashed_password: str) -> bool:
+    """Verify password against hash"""
+    return hash_password(password) == hashed_password

@@ -118,3 +118,20 @@ def validate_health_form(data):
     except Exception as e:
         error_field = str(e)
         return False, f"Dữ liệu không hợp lệ hoặc thiếu cho trường: {error_field}. Vui lòng kiểm tra lại."
+    
+
+def validate_form_data(form_data: dict) -> tuple[bool, str]:
+    """Wrapper for compatibility with other routes"""
+    is_valid, result = validate_health_form(form_data)
+    if is_valid:
+        return True, ""
+    else:
+        return False, result
+
+def sanitize_form_data(form_data: dict) -> dict:
+    """Sanitize form data - already done in validate_health_form"""
+    is_valid, result = validate_health_form(form_data)
+    if is_valid:
+        return result
+    else:
+        return form_data

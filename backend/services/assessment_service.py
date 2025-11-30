@@ -1,67 +1,106 @@
-from datetime import datetime
-from typing import Optional, Dict, Any, List
+from datasources.mongodb import get_assessment_collection
+from models.assessment_model import make_assessment_doc, parse_assessment_doc, invalidate_previous_assessments
 from bson import ObjectId
+import logging
 
-from models import Assessment, PyObjectId
+logger = logging.getLogger(__name__)
 
-
-class AssessmentService:
-    def __init__(self, assessments_col):
-        self.col = assessments_col
-
-    def _doc_to_assessment(self, doc) -> Assessment:
-        return Assessment(**doc)
-
-    def get_active_assessment(
-        self,
-        user_id: PyObjectId,
-    ) -> Optional[Assessment]:
-
-        doc = self.col.find_one(
-            {
-                "user_id": ObjectId(user_id),
-                "$or": [
-                    {"is_valid": True},
-                ],
-            },
-            sort=[("measured_at", -1)],
-        )
-        return self._doc_to_assessment(doc) if doc else None
-
-    def create_assessment(
-        self,
-        user_id: PyObjectId,
-        metrics: Dict[str, Any],
-        measured_at: Optional[datetime] = None,
-        prediction: Optional[Dict[str, Any]] = None,
-    ) -> Assessment:
-        if measured_at is None:
-            measured_at = datetime.utcnow()
-        now = datetime.utcnow()
-
-        active = self.get_active_assessment(user_id=user_id)
-        if active is not None:
-            self.col.update_one(
-                {"_id": ObjectId(active.id)},
-                {"$set": {"is_valid": False}},
-            )
-
-        # tạo assessment mới
-        doc = {
-            "user_id": ObjectId(user_id),
-            "measured_at": measured_at,
-            "created_at": now,
-            "is_valid": True,
-            "metrics": metrics,
+def create_assessment(user_id: str, form_data: dict, prediction: int) -> str:
+    """Create new assessment and invalidate previous ones
+    
+    Args:
+        user_id: User ID string
+        form_data: Form data dictionary (metrics)
+        prediction: Prediction result (0 or 1)
+    
+    Returns:
+        assessment_id: Created assessment ID
+    """
+    try:
+        # Invalidate previous assessments (Business Rule)
+        invalidate_previous_assessments(user_id)
+        
+        # Build prediction document
+        prediction_result = {
             "prediction": prediction,
+            "risk_level": "high" if prediction == 1 else "low",
+            "risk_score": float(prediction),  # You can enhance this later
+            "model_version": "v1.0"
         }
+        
+        # Create new assessment
+        col = get_assessment_collection()
+        doc = make_assessment_doc(user_id, form_data, prediction_result)
+        result = col.insert_one(doc)
+        
+        logger.info(f"Assessment created for user {user_id}: prediction={prediction}")
+        return str(result.inserted_id)
+    except Exception as e:
+        logger.error(f"Error creating assessment: {e}")
+        raise
 
-        result = self.col.insert_one(doc)
-        doc["_id"] = result.inserted_id
-        return self._doc_to_assessment(doc)
+def get_assessments_by_user(user_id: str, valid_only: bool = False) -> list:
+    """Get assessments of a user
+    
+    Args:
+        user_id: User ID string
+        valid_only: If True, only return valid assessments
+    
+    Returns:
+        assessments: List of assessment dicts, sorted by newest first
+    """
+    try:
+        col = get_assessment_collection()
+        
+        query = {"user_id": user_id}
+        if valid_only:
+            query["is_valid"] = True
+        
+        cursor = col.find(query).sort("created_at", -1)
+        return [parse_assessment_doc(doc) for doc in cursor]
+    except Exception as e:
+        logger.error(f"Error getting assessments: {e}")
+        return []
 
-    def list_assessments(self, user_id: PyObjectId):
-        cursor = self.col.find(
-            {"user_id": ObjectId(user_id)}
-        ).sort("measured_at", -1)
-        return [self._doc_to_assessment(d) for d in cursor]
+def get_assessment_by_id(assessment_id: str) -> dict:
+    """Get assessment by ID"""
+    try:
+        col = get_assessment_collection()
+        doc = col.find_one({"_id": ObjectId(assessment_id)})
+        return parse_assessment_doc(doc) if doc else None
+    except Exception as e:
+        logger.error(f"Error getting assessment by ID: {e}")
+        return None
+
+def get_latest_valid_assessment(user_id: str) -> dict:
+    """Get latest VALID assessment of user (Business Rule)
+    
+    Args:
+        user_id: User ID string
+    
+    Returns:
+        assessment: Latest valid assessment dict or None
+    """
+    try:
+        col = get_assessment_collection()
+        doc = col.find_one(
+            {"user_id": user_id, "is_valid": True},
+            sort=[("created_at", -1)]
+        )
+        return parse_assessment_doc(doc) if doc else None
+    except Exception as e:
+        logger.error(f"Error getting latest valid assessment: {e}")
+        return None
+
+def get_latest_assessment(user_id: str) -> dict:
+    """Get latest assessment (regardless of validity)"""
+    try:
+        col = get_assessment_collection()
+        doc = col.find_one(
+            {"user_id": user_id},
+            sort=[("created_at", -1)]
+        )
+        return parse_assessment_doc(doc) if doc else None
+    except Exception as e:
+        logger.error(f"Error getting latest assessment: {e}")
+        return None

@@ -21,3 +21,6 @@ streamlit
 # --- Shared Libraries ---
 requests
 google-generativeai
+
+flask-cors==4.0.0
+pymongo==4.6.1

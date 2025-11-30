@@ -1,39 +1,90 @@
-from datetime import datetime
-from typing import Optional, Dict, Any, List
-from bson import ObjectId
-from models import Message, PyObjectId
+from datasources.mongodb import get_message_collection
+from models.message_model import make_message_doc, parse_message_doc
+import logging
 
+logger = logging.getLogger(__name__)
 
-class MessageService:
-    def __init__(self, chat_col):
-        self.col = chat_col
+def create_message(assessment_id: str, sender_type: str, content: str, metadata: dict = None) -> str:
+    """Create new message
+    
+    Args:
+        assessment_id: Assessment ID string (can be None)
+        sender_type: 'user' or 'agent'
+        content: Message content
+        metadata: Optional metadata
+    
+    Returns:
+        message_id: Created message ID
+    """
+    try:
+        col = get_message_collection()
+        doc = make_message_doc(assessment_id, sender_type, content, metadata)
+        result = col.insert_one(doc)
+        logger.info(f"Message created: sender_type={sender_type}, assessment_id={assessment_id}")
+        return str(result.inserted_id)
+    except Exception as e:
+        logger.error(f"Error creating message: {e}")
+        raise
 
-    def _doc_to_message(self, doc) -> Message:
-        return Message(**doc)
+def get_messages_by_assessment(assessment_id: str, limit: int = None) -> list:
+    """Get chat history by assessment ID
+    
+    Args:
+        assessment_id: Assessment ID string
+        limit: Max number of messages (None = all)
+    
+    Returns:
+        messages: List of message dicts, sorted by timestamp
+    """
+    try:
+        col = get_message_collection()
+        cursor = col.find({"assessment_id": assessment_id}).sort("created_at", 1)
+        
+        if limit:
+            cursor = cursor.limit(limit)
+        
+        return [parse_message_doc(doc) for doc in cursor]
+    except Exception as e:
+        logger.error(f"Error getting messages: {e}")
+        return []
 
-    def add_message(
-        self,
-        user_id: PyObjectId,
-        content: str,
-        sender_type: str = "user",
-        assessment_id: Optional[PyObjectId] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Message:
-        now = datetime.utcnow()
-        doc = {
-            "user_id": ObjectId(user_id),
-            "assessment_id": ObjectId(assessment_id) if assessment_id else None,
-            "sender_type": sender_type,
-            "content": content,
-            "created_at": now,
-            "metadata": metadata or {},
-        }
-        result = self.col.insert_one(doc)
-        doc["_id"] = result.inserted_id
-        return self._doc_to_message(doc)
+def get_messages_by_user(user_id: str, limit: int = None) -> list:
+    """Get all messages of a user (across all assessments)
+    
+    Args:
+        user_id: User ID string
+        limit: Max number of messages
+    
+    Returns:
+        messages: List of message dicts
+    """
+    try:
+        from datasources.mongodb import get_assessment_collection
+        
+        # Get all assessment IDs of user
+        col = get_assessment_collection()
+        assessments = col.find({"user_id": user_id}, {"_id": 1})
+        assessment_ids = [str(a["_id"]) for a in assessments]
+        
+        # Get messages for these assessments
+        msg_col = get_message_collection()
+        cursor = msg_col.find({"assessment_id": {"$in": assessment_ids}}).sort("created_at", -1)
+        
+        if limit:
+            cursor = cursor.limit(limit)
+        
+        return [parse_message_doc(doc) for doc in cursor]
+    except Exception as e:
+        logger.error(f"Error getting user messages: {e}")
+        return []
 
-    def list_messages_by_user(self, user_id: PyObjectId, limit: int = 50) -> List[Message]:
-        cursor = self.col.find(
-            {"user_id": ObjectId(user_id)}
-        ).sort("created_at", 1).limit(limit)
-        return [self._doc_to_message(d) for d in cursor]
+def delete_messages_by_assessment(assessment_id: str) -> int:
+    """Delete all messages of an assessment"""
+    try:
+        col = get_message_collection()
+        result = col.delete_many({"assessment_id": assessment_id})
+        logger.info(f"Deleted {result.deleted_count} messages for assessment {assessment_id}")
+        return result.deleted_count
+    except Exception as e:
+        logger.error(f"Error deleting messages: {e}")
+        return 0

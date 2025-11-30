@@ -1,42 +1,65 @@
-import os
-from urllib.parse import quote_plus
 from pymongo import MongoClient
-from dotenv import load_dotenv
+from config import Config
+import logging
+from urllib.parse import quote_plus  # ← ADD THIS
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
-DOTENV_PATH = os.path.join(BASE_DIR, ".env")
-load_dotenv(DOTENV_PATH)
+logger = logging.getLogger(__name__)
 
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_CLUSTER = os.getenv("DB_CLUSTER")       
-DB_NAME = os.getenv("DB_NAME", "DCA_DB")
+# Global MongoDB client
+_mongo_client = None
+_db = None
 
-DB_USER_Q = quote_plus(DB_USER or "")
-DB_PASSWORD_Q = quote_plus(DB_PASSWORD or "")
-
-MONGO_URI = (
-    f"mongodb+srv://{DB_USER_Q}:{DB_PASSWORD_Q}"
-    f"@{DB_CLUSTER}/{DB_NAME}?retryWrites=true&w=majority"
-)
-
-client = MongoClient(
-    MONGO_URI
-)
-
-db = client[DB_NAME]
+def get_mongo_client():
+    """Get or create MongoDB client (singleton)"""
+    global _mongo_client, _db
+    
+    if _mongo_client is None:
+        try:
+            # Escape username and password
+            username = quote_plus(Config.DB_USER)  # ← ENCODE
+            password = quote_plus(Config.DB_PASSWORD)  # ← ENCODE
+            
+            # Build connection string with encoded credentials
+            connection_string = (
+                f"mongodb+srv://{username}:{password}@"
+                f"{Config.DB_CLUSTER}/{Config.DB_NAME}?"
+                "retryWrites=true&w=majority"
+            )
+            
+            _mongo_client = MongoClient(connection_string)
+            _db = _mongo_client[Config.DB_NAME]
+            
+            # Test connection
+            _mongo_client.admin.command('ping')
+            logger.info(f"✓ Connected to MongoDB: {Config.DB_NAME}")
+            
+        except Exception as e:
+            logger.error(f"MongoDB initialization error: {e}")
+            raise
+    
+    return _mongo_client, _db
 
 def get_user_collection():
-    return db['USER']
+    """Get users collection"""
+    _, db = get_mongo_client()
+    return db['users']
 
 def get_assessment_collection():
-    return db["ASSESSMENT"]
-
+    """Get assessments collection"""
+    _, db = get_mongo_client()
+    return db['assessments']
 
 def get_message_collection():
-    return db["MESSAGE"]
+    """Get messages collection"""
+    _, db = get_mongo_client()
+    return db['messages']
 
-# test
-if __name__ == "__main__":
-    print("Database:", db.name)
-    print("Collections:", db.list_collection_names())
+def test_connection():
+    """Test MongoDB connection"""
+    try:
+        client, _ = get_mongo_client()
+        client.admin.command('ping')
+        return True
+    except Exception as e:
+        logger.error(f"MongoDB connection test failed: {e}")
+        return False

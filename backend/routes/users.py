@@ -1,46 +1,65 @@
 from flask import Blueprint, request, jsonify
-from services import UserService
-from models import PyObjectId
-from datasources.mongodb import get_user_collection
+from services.user_service import create_user, validate_user, get_user_by_id
 
-bp_users = Blueprint("users", __name__, url_prefix="/users")
-user_service = UserService(get_user_collection())
+bp = Blueprint('users', __name__, url_prefix='/api/users')
 
+@bp.route('/register', methods=['POST'])
+def register():
+    """Register new user"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        name = data.get('name') or data.get('username')  # Support both
+        password = data.get('password')
+        
+        if not name or not password:
+            return jsonify({"error": "Name and password are required"}), 400
+        
+        user_id = create_user(name, password)
+        return jsonify({
+            "user_id": user_id, 
+            "message": "User created successfully"
+        }), 201
+        
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
-@bp_users.post("/")
-def create_user():
-    data = request.json or {}
-    username = data.get("username")
-    password = data.get("password")
-
-    if not username or not password:
-        return jsonify({"error": "username and password are required"}), 400
-
-    existing = user_service.get_user_by_name(username)
-    if existing:
-        return jsonify({"error": "user already exists"}), 400
-
-    user = user_service.create_user(username, password)
-    return jsonify(
-        {
-            "id": str(user.id),
-            "username": user.username,
-            "created_at": user.created_at.isoformat(),
-        }
-    ), 201
-
-
-@bp_users.post("/login")
+@bp.route('/login', methods=['POST'])
 def login():
-    data = request.json or {}
-    username = data.get("username")
-    password = data.get("password")
+    """Login user"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        name = data.get('name') or data.get('username')  # Support both
+        password = data.get('password')
+        
+        if not name or not password:
+            return jsonify({"error": "Name and password are required"}), 400
+        
+        user = validate_user(name, password)
+        return jsonify({
+            "user": user, 
+            "message": "Login successful"
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 401
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
-    if not username or not password:
-        return jsonify({"error": "name and password are required"}), 400
-
-    user = user_service.authenticate(username, password)
-    if not user:
-        return jsonify({"error": "invalid credentials"}), 401
-
-    return jsonify({"user_id": str(user.id), "username": user.username})
+@bp.route('/<user_id>', methods=['GET'])
+def get_user(user_id):
+    """Get user by ID"""
+    try:
+        user = get_user_by_id(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        return jsonify({"user": user}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
