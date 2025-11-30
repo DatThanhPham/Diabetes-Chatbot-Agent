@@ -4,6 +4,7 @@ from predict.predict_model import predictor
 from services.assessment_service import create_assessment, get_assessment_by_id
 from services.message_service import create_message
 import google.generativeai as genai
+import traceback  # ✅ FIX 1: THÊM IMPORT
 
 bp = Blueprint('app_routes', __name__, url_prefix='/api')
 
@@ -14,7 +15,6 @@ def get_rag_content():
         current_app.logger.warning("KNOWLEDGE_FILE_IDS not configured")
         return []
     
-    # Tách chuỗi ID thành list và lấy reference
     file_id_list = [fid.strip() for fid in file_ids_str.split(',') if fid.strip()]
     rag_files = []
     
@@ -36,25 +36,21 @@ def generate_response_with_files(prompt_text):
             return "Hệ thống chưa tải được tài liệu kiến thức. Vui lòng kiểm tra cấu hình."
 
         model = genai.GenerativeModel('gemini-2.0-flash')
-        
-        # Gửi Prompt + Tất cả File
         content_to_send = [prompt_text] + rag_files
         response = model.generate_content(content_to_send)
         return response.text
     except Exception as e:
         current_app.logger.error(f"Gemini error: {e}")
         return "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau."
-    
+
 def build_profile_text(record):
     """Tạo tóm tắt hồ sơ người dùng để AI nhớ ngữ cảnh"""
     if not record:
         return "Chưa có hồ sơ sức khỏe."
     
-    # Hỗ trợ cả format cũ và mới
     data = record.get('form_data') or record.get('metrics', {})
     pred_data = record.get('prediction', {})
     
-    # Lấy prediction value
     if isinstance(pred_data, dict):
         pred = pred_data.get('prediction', 0)
         risk_level = pred_data.get('risk_level', 'unknown')
@@ -62,7 +58,6 @@ def build_profile_text(record):
         pred = pred_data
         risk_level = 'high' if pred == 1 else 'low'
     
-    # Logic dự đoán 0/1
     pred_text = "⚠️ Nguy cơ CAO (Có khả năng tiểu đường)" if pred == 1 else "✅ Nguy cơ THẤP (An toàn)"
     
     factors = []
@@ -83,7 +78,6 @@ def build_profile_text(record):
     
     risk_text = ", ".join(factors) if factors else "Không có yếu tố rủi ro đáng kể"
     
-    # Age mapping
     age_map = {
         1: "18-24", 2: "25-29", 3: "30-34", 4: "35-39", 5: "40-44",
         6: "45-49", 7: "50-54", 8: "55-59", 9: "60-64", 10: "65-69",
@@ -118,21 +112,18 @@ def analyze_risk():
     try:
         form_data = request.get_json()
         
-        # 1. Validate
         is_valid, result = validate_health_form(form_data)
         if not is_valid:
             return jsonify({"error": result}), 400
         
         validated_data = result
 
-        # 2. Predict
         try:
             if predictor is None:
                 raise RuntimeError("Predictor not initialized")
             
             prediction = predictor.predict(validated_data)
             
-            # Get probabilities
             try:
                 proba = predictor.predict_proba(validated_data)
                 risk_score = proba.get('high_risk', float(prediction))
@@ -145,7 +136,6 @@ def analyze_risk():
             current_app.logger.error(f"Model error: {e}")
             return jsonify({"error": f"Lỗi mô hình dự đoán: {str(e)}"}), 500
 
-        # Trả về kết quả ngay lập tức
         return jsonify({
             "prediction": int(prediction),
             "risk_level": "high" if prediction == 1 else "low",
@@ -164,8 +154,10 @@ def get_advice():
         data = request.get_json()
         validated_data = data.get('validated_data')
         prediction = data.get('prediction')
-        user_id = data.get('user_id')  # Optional
+        user_id = data.get('user_id')
         risk_score = data.get('risk_score', float(prediction))
+
+        current_app.logger.info(f"📥 get_advice called: user_id={user_id}, prediction={prediction}")
 
         if validated_data is None or prediction is None:
             return jsonify({"error": "Thiếu dữ liệu đầu vào"}), 400
@@ -194,42 +186,72 @@ Yêu cầu phản hồi:
 Hãy viết bằng tiếng Việt, dễ hiểu, thân thiện và có emoji để dễ đọc!
 """
         
+        current_app.logger.info("🤖 Generating advice with Gemini...")
         advice = generate_response_with_files(prompt)
+        current_app.logger.info(f"✅ Advice generated: {len(advice)} chars")
 
-        # Optional: Save to DB if user_id provided
+        # ✅ FIX 2: Save to DB if user_id provided
         assessment_id = None
         if user_id:
             try:
-                # Save assessment
-                assessment_id = create_assessment(
+                risk_level = 'high' if prediction == 1 else 'low'
+                
+                current_app.logger.info(f"💾 Creating assessment for user {user_id}...")
+                
+                result = create_assessment(
                     user_id=user_id,
-                    form_data=validated_data,
-                    prediction=int(prediction),
-                    risk_score=risk_score
+                    metrics=validated_data,
+                    prediction={
+                        'prediction': int(prediction),
+                        'risk_score': float(risk_score),
+                        'risk_level': risk_level,
+                        'model_version': 'stacking_ensemble_v1'
+                    }
                 )
                 
-                # Save advice as initial message
-                create_message(
-                    assessment_id=assessment_id,
-                    sender_type='agent',
-                    content=advice,
-                    metadata={'type': 'initial_advice'}
-                )
+                current_app.logger.info(f"📝 create_assessment result: {result}")
                 
-                current_app.logger.info(f"Saved assessment {assessment_id} for user {user_id}")
+                # ✅ FIX 3: Kiểm tra result đúng cách
+                if result.get('success'):
+                    assessment_id = result['data']['id']
+                    current_app.logger.info(f"✅ Assessment created: {assessment_id}")
+                    
+                    # ✅ FIX 4: Save initial advice message
+                    msg_result = create_message(
+                        assessment_id=assessment_id,
+                        sender_type='agent',
+                        content=advice,
+                        metadata={'type': 'initial_advice'}
+                    )
+                    
+                    current_app.logger.info(f"📨 create_message result: {msg_result}")
+                    
+                    if msg_result.get('success'):
+                        current_app.logger.info(f"✅ Initial advice saved as message")
+                    else:
+                        current_app.logger.warning(f"⚠️ Failed to save message: {msg_result.get('error')}")
+                else:
+                    current_app.logger.error(f"❌ Failed to create assessment: {result.get('error')}")
                 
             except Exception as e:
-                current_app.logger.error(f"Error saving to DB: {e}")
-                # Continue anyway, advice is still valid
+                current_app.logger.error(f"❌ Error saving to DB: {e}")
+                current_app.logger.error(traceback.format_exc())
+                # Continue anyway - advice is still valid
 
-        # Return advice
+        # ✅ FIX 5: Return advice
+        current_app.logger.info(f"📤 Returning advice: assessment_id={assessment_id}")
+        
         return jsonify({
             "advice": advice,
-            "assessment_id": assessment_id
+            "assessment_id": assessment_id,
+            "prediction": int(prediction),
+            "risk_score": float(risk_score),
+            "risk_level": "high" if prediction == 1 else "low"
         }), 200
         
     except Exception as e:
-        current_app.logger.error(f"Get advice error: {e}")
+        current_app.logger.error(f"❌ Get advice error: {e}")
+        current_app.logger.error(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/chat_with_rag', methods=['POST'])
@@ -249,9 +271,12 @@ def chat_with_rag():
             try:
                 assessment = get_assessment_by_id(assessment_id)
                 if assessment:
-                    context = build_profile_text(assessment)
-            except:
-                pass
+                    context = build_profile_text({
+                        'metrics': assessment.get('metrics', {}),
+                        'prediction': assessment.get('prediction', {})
+                    })
+            except Exception as e:
+                current_app.logger.warning(f"Could not load assessment context: {e}")
         
         # Build prompt
         prompt = f"""
@@ -281,23 +306,11 @@ Yêu cầu:
         if assessment_id:
             try:
                 # Save user message
-                create_message(
-                    assessment_id=assessment_id,
-                    sender_type='user',
-                    content=user_message
-                )
-                
+                create_message(assessment_id, 'user', user_message)
                 # Save AI response
-                create_message(
-                    assessment_id=assessment_id,
-                    sender_type='agent',
-                    content=response_text
-                )
-                
-                current_app.logger.info(f"Saved chat to assessment {assessment_id}")
-                
+                create_message(assessment_id, 'agent', response_text)
             except Exception as e:
-                current_app.logger.error(f"Error saving chat: {e}")
+                current_app.logger.warning(f"Could not save messages: {e}")
         
         return jsonify({
             "response": response_text

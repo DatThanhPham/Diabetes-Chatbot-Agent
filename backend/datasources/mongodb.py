@@ -1,7 +1,10 @@
+"""
+MongoDB Connection Manager
+"""
 from pymongo import MongoClient
 from config import Config
 import logging
-from urllib.parse import quote_plus  # ← ADD THIS
+from urllib.parse import quote_plus
 
 logger = logging.getLogger(__name__)
 
@@ -16,17 +19,17 @@ def get_mongo_client():
     if _mongo_client is None:
         try:
             # Escape username and password
-            username = quote_plus(Config.DB_USER)  # ← ENCODE
-            password = quote_plus(Config.DB_PASSWORD)  # ← ENCODE
+            username = quote_plus(Config.DB_USER)
+            password = quote_plus(Config.DB_PASSWORD)
             
-            # Build connection string with encoded credentials
+            # Build connection string
             connection_string = (
                 f"mongodb+srv://{username}:{password}@"
                 f"{Config.DB_CLUSTER}/{Config.DB_NAME}?"
                 "retryWrites=true&w=majority"
             )
             
-            _mongo_client = MongoClient(connection_string)
+            _mongo_client = MongoClient(connection_string, serverSelectionTimeoutMS=10000)
             _db = _mongo_client[Config.DB_NAME]
             
             # Test connection
@@ -39,19 +42,24 @@ def get_mongo_client():
     
     return _mongo_client, _db
 
+def get_db():
+    """Get database instance - ADDED THIS FUNCTION"""
+    _, db = get_mongo_client()
+    return db
+
 def get_user_collection():
     """Get users collection"""
-    _, db = get_mongo_client()
+    db = get_db()
     return db['users']
 
 def get_assessment_collection():
     """Get assessments collection"""
-    _, db = get_mongo_client()
+    db = get_db()
     return db['assessments']
 
 def get_message_collection():
     """Get messages collection"""
-    _, db = get_mongo_client()
+    db = get_db()
     return db['messages']
 
 def test_connection():

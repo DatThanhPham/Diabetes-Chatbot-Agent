@@ -14,3 +14,4 @@ class Config:
     KNOWLEDGE_FILE_IDS = os.environ.get('KNOWLEDGE_FILE_IDS')
     MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '../models')
     DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+    MODEL_PATH = os.path.join(os.path.dirname(__file__), '..', 'models', 'stacking_ensemble_model.bin')

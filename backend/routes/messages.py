@@ -177,9 +177,9 @@ Sử dụng tiếng Việt và emoji để dễ đọc.
 """
         else:
             # User asking question - save user message first
-            create_message(assessment_id, 'user', user_message)
-            chat_history.append({'sender_type': 'user', 'content': user_message})
-            
+            user_msg_result = create_message(assessment_id, 'user', user_message)
+            if not user_msg_result.get('success'):
+                current_app.logger.error(f"Failed to save user message: {user_msg_result.get('error')}")
             # Rebuild context with new message
             context = build_context_prompt(assessment, chat_history)
             

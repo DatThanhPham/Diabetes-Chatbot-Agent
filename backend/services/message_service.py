@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def create_message(assessment_id: str, sender_type: str, content: str, metadata: dict = None) -> str:
+def create_message(assessment_id: str, sender_type: str, content: str, metadata: dict = None) -> dict:
     """Create new message
     
     Args:
@@ -14,17 +14,31 @@ def create_message(assessment_id: str, sender_type: str, content: str, metadata:
         metadata: Optional metadata
     
     Returns:
-        message_id: Created message ID
+        dict: {'success': bool, 'data': {'id': str}, 'error': str}
     """
     try:
         col = get_message_collection()
         doc = make_message_doc(assessment_id, sender_type, content, metadata)
         result = col.insert_one(doc)
+        
+        message_id = str(result.inserted_id)
+        
         logger.info(f"Message created: sender_type={sender_type}, assessment_id={assessment_id}")
-        return str(result.inserted_id)
+        
+        return {
+            'success': True,
+            'data': {
+                'id': message_id,
+                'assessment_id': assessment_id,
+                'sender_type': sender_type
+            }
+        }
     except Exception as e:
         logger.error(f"Error creating message: {e}")
-        raise
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 def get_messages_by_assessment(assessment_id: str, limit: int = None) -> list:
     """Get chat history by assessment ID
