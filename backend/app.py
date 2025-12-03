@@ -4,6 +4,7 @@ from config import Config
 import google.generativeai as genai
 import os
 import logging
+from flask_jwt_extended import JWTManager
 
 # Configure logging
 logging.basicConfig(
@@ -14,6 +15,8 @@ logging.basicConfig(
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    
+    jwt = JWTManager(app)
     
     # Enable CORS for Streamlit
     CORS(app, resources={r"/api/*": {"origins": "*"}})
