@@ -68,7 +68,8 @@ def get_user(user_id):
         return jsonify({"user": user}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+   
+@bp.post("/refresh")    
 @jwt_required(refresh=True)
 def refresh_access_token():
     current_user_id = get_jwt_identity()

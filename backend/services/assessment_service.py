@@ -73,9 +73,7 @@ def create_assessment(user_id: str, metrics: dict, prediction: dict) -> dict:
         
         result = db.assessments.insert_one(assessment_data)
         
-        # Return created assessment with ID
-        assessment_data['_id'] = result.inserted_id
-        assessment_data['id'] = str(result.inserted_id)
+        assessment_data['id'] = str(assessment_data.pop('_id'))
         
         return {
             'success': True,
