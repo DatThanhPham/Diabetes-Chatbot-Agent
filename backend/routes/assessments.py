@@ -88,8 +88,8 @@ def create_new_assessment():
 def get_user_assessments(user_id):
     """Get all assessments of a user"""
     try:
-        user_id = get_jwt_identity()
-        if str(user_id) != str(user_id):
+        jwt_user_id = get_jwt_identity()
+        if str(jwt_user_id) != str(user_id):
             return jsonify({"error": "Forbidden"}), 403
         
         valid_only = request.args.get('valid_only', 'false').lower() == 'true'

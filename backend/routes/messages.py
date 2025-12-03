@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.message_service import create_message, get_messages_by_assessment
 from services.assessment_service import get_assessment_by_id
 import google.generativeai as genai
@@ -112,6 +113,7 @@ def build_context_prompt(assessment: dict, chat_history: list) -> str:
     return context
 
 @bp.route('/chat', methods=['POST'])
+@jwt_required()
 def chat():
     """Handle chat with AI - includes memory from assessment and chat history"""
     try:
@@ -120,7 +122,6 @@ def chat():
             return jsonify({"error": "No data provided"}), 400
         
         assessment_id = data.get('assessment_id')
-        user_message = data.get('user_message')
         
         if not assessment_id:
             return jsonify({"error": "assessment_id is required"}), 400
@@ -129,6 +130,14 @@ def chat():
         assessment = get_assessment_by_id(assessment_id)
         if not assessment:
             return jsonify({"error": "Assessment not found"}), 404
+        
+        user_id = get_jwt_identity()     
+        
+        owner_id = str(assessment.get("user_id"))
+        if str(owner_id) != str(user_id):
+            return jsonify({"error": "Forbidden: not your assessment"}), 403
+        
+        user_message = data.get('user_message')
         
         # Get chat history (for memory)
         chat_history = get_messages_by_assessment(assessment_id)
@@ -234,19 +243,37 @@ Yêu cầu:
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/messages/assessment/<assessment_id>', methods=['GET'])
+@jwt_required()
 def get_messages(assessment_id):
     """Get chat history of an assessment"""
     try:
+        user_id = get_jwt_identity()
+        assessment = get_assessment_by_id(assessment_id)
+        if not assessment:
+            return jsonify({"error": "Assessment not found"}), 404
+
+        if str(assessment.get("user_id")) != str(user_id):
+            return jsonify({"error": "Forbidden: not your assessment"}), 403
+        
         messages = get_messages_by_assessment(assessment_id)
         return jsonify(messages), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @bp.route('/messages/assessment/<assessment_id>', methods=['DELETE'])
+@jwt_required()
 def delete_messages(assessment_id):
     """Delete all messages of an assessment"""
     try:
         from services.message_service import delete_messages_by_assessment
+        user_id = get_jwt_identity()
+        assessment = get_assessment_by_id(assessment_id)
+        if not assessment:
+            return jsonify({"error": "Assessment not found"}), 404
+
+        if str(assessment.get("user_id")) != str(user_id):
+            return jsonify({"error": "Forbidden: not your assessment"}), 403
+        
         count = delete_messages_by_assessment(assessment_id)
         return jsonify({
             "message": f"Deleted {count} messages",
