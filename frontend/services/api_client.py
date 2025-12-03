@@ -16,6 +16,16 @@ class APIClient:
         self.session.headers.update({
             'Content-Type': 'application/json'
         })
+        self.auth_token = None
+        
+    def set_auth_token(self, token: str | None):
+        self.auth_token = token
+        if token:
+            self.session.headers['Authorization'] = f'Bearer {token}'
+        else:
+            # logout / clear token
+            self.session.headers.pop('Authorization', None)
+
     
     def post(self, endpoint, data=None, json=None):
         """POST request"""
@@ -48,7 +58,7 @@ class APIClient:
             error_msg = 'Unknown error'
             try:
                 error_data = response.json()
-                error_msg = error_data.get('error', str(e))
+                error_msg = error_data.get('error') or error_data.get('msg', str(e))
             except:
                 error_msg = str(e)
             

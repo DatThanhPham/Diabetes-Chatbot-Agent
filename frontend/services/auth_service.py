@@ -41,6 +41,17 @@ def login_user(username, password):
             'password': password
         })
         
-        return api_client.handle_response(response)
+        result = api_client.handle_response(response)
+        if result.get('success'):
+            data = result['data']
+            access_token = data.get('access_token')
+            if access_token:
+                api_client.set_auth_token(access_token)
+        
+        return result
     except Exception as e:
         return {'success': False, 'error': str(e)}
+    
+def logout_user():
+    api_client.set_auth_token(None)
+    return {'success': True}
