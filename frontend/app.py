@@ -33,6 +33,7 @@ IMAGE_PATH = "./background.jpg"
 img_base64 = get_base64_of_image(IMAGE_PATH)
 
 # Custom CSS
+# Custom CSS
 st.markdown(f"""
 <style>
     /* CRITICAL: Hide Streamlit default page navigation */
@@ -49,10 +50,6 @@ st.markdown(f"""
     /* Sidebar gradient */
     [data-testid="stSidebar"] {{
         background: linear-gradient(180deg, #ffffff 0%, #e3f2fd 100%) !important;
-    }}
-    
-    [data-testid="stSidebar"] * {{
-        color: #1a1a1a !important;
     }}
     
     /* Background image */
@@ -87,16 +84,28 @@ st.markdown(f"""
     
     /* Primary button (active menu) */
     .stButton > button[kind="primary"] {{
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border: none;
-        color: white;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        border: none !important;
+        color: white !important;
+        font-weight: 700 !important;
+    }}
+    
+    .stButton > button[kind="primary"]:hover {{
+        background: linear-gradient(135deg, #7c8ff0 0%, #8a5bb0 100%) !important;
     }}
     
     /* Secondary button (inactive menu) */
     .stButton > button[kind="secondary"] {{
-        background: transparent;
-        border: 2px solid rgba(0,0,0,0.1);
-        color: #666;
+        background: white !important;
+        border: 2px solid rgba(102, 126, 234, 0.3) !important;
+        color: #333 !important;
+        font-weight: 600 !important;
+    }}
+    
+    .stButton > button[kind="secondary"]:hover {{
+        background: rgba(102, 126, 234, 0.1) !important;
+        border: 2px solid rgba(102, 126, 234, 0.5) !important;
+        color: #667eea !important;
     }}
     
     /* Input fields */
@@ -129,12 +138,17 @@ init_session_state()
 def main():
     """Main application"""
     
-    # Check authentication
-    if not is_logged_in():
-        show_auth_page()
-        return
+    # # Check authentication
+    # if not is_logged_in():
+    #     show_auth_page()
+    #     return
     
-    user = get_user()
+    # user = get_user()
+
+    user = {
+        "id": "692c1c7b48e77a615327f0df",
+        "name": "Nguyễn Văn A",
+    }
     
     # Sidebar
     with st.sidebar:

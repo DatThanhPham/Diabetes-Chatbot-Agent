@@ -6,11 +6,97 @@ from services.assessment_service import get_user_assessments
 from utils.helpers import get_risk_level_info, format_date, format_risk_score
 from utils.session_state import navigate_to
 import plotly.graph_objects as go
+import base64
+import os
+
+def get_base64_image(image_path):
+    """Convert image to base64"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception as e:
+        print(f"Không thể load ảnh: {e}")
+        return None
 
 def show_dashboard(user):
     """Display dashboard"""
     
-    st.markdown('<h1 style="text-align: center; color: #1f77b4;">📊 Dashboard</h1>', unsafe_allow_html=True)
+    # Get background image
+    image_path = os.path.join(os.path.dirname(__file__), "..", "assets", "background.jpg")
+    base64_image = get_base64_image(image_path)
+    
+    # Custom CSS for background and styling
+    background_css = f"""
+    <style>
+    /* Background image */
+    .stApp {{
+        background-image: url('data:image/jpeg;base64,{base64_image}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    
+    /* Make containers transparent */
+    .main {{
+        background-color: transparent !important;
+    }}
+    
+    .block-container {{
+        background-color: transparent !important;
+        padding-top: 2rem;
+    }}
+    
+    [data-testid="stVerticalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    [data-testid="stHorizontalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    /* Add overlay for better readability */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.4);
+        z-index: 0;
+        pointer-events: none;
+    }}
+    
+    .main > div {{
+        position: relative;
+        z-index: 1;
+    }}
+    
+    /* Style for content cards */
+    .element-container {{
+        background-color: transparent !important;
+    }}
+    
+    /* Style metrics with semi-transparent background */
+    [data-testid="stMetric"] {{
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }}
+    
+    /* Style buttons */
+    .stButton > button {{
+        background-color: rgba(31, 119, 180, 0.95) !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }}
+    </style>
+    """ if base64_image else ""
+    
+    st.markdown(background_css, unsafe_allow_html=True)
+    
+    st.markdown('<h1 style="text-align: center; color: #1f77b4; text-shadow: 2px 2px 4px rgba(255,255,255,0.8);">📊 Dashboard</h1>', unsafe_allow_html=True)
     st.markdown("---")
     
     # Get assessments
@@ -29,7 +115,6 @@ def show_dashboard(user):
         
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            # FIX: Add unique key
             if st.button("📝 Bắt đầu đánh giá", use_container_width=True, type="primary", key="dashboard_start_assessment"):
                 navigate_to("Đánh giá mới")
                 st.rerun()
@@ -41,15 +126,17 @@ def show_dashboard(user):
     
     st.markdown("### 🎯 Tình trạng hiện tại")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns([0.25, 1.5])
     
     with col1:
         st.metric("📋 Tổng số đánh giá", len(assessments))
     
     with col2:
-        risk_info = get_risk_level_info(latest_assessment.get('risk_level', 'low'))
+        prediction = latest_assessment.get('prediction', {})
+        risk_level = prediction.get('risk_level', 'low')
+        risk_info = get_risk_level_info(risk_level)
         st.markdown(f"""
-        <div style="text-align: center; padding: 1rem; background-color: {risk_info['bg_color']}; border-radius: 8px;">
+        <div style="text-align: center; padding: 1rem; background-color: {risk_info['bg_color']}; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
             <p style="margin: 0; color: #666;">Nguy cơ hiện tại</p>
             <h2 style="margin: 0; color: {risk_info['color']};">{risk_info['label']}</h2>
         </div>
@@ -59,7 +146,9 @@ def show_dashboard(user):
     st.markdown("---")
     st.markdown("### 📋 Đánh giá gần nhất")
     
-    risk_info = get_risk_level_info(latest_assessment.get('risk_level', 'low'))
+    prediction = latest_assessment.get('prediction', {})
+    risk_level = prediction.get('risk_level', 'low')
+    risk_info = get_risk_level_info(risk_level)
     
     st.markdown(f"""
     <div style="
@@ -71,7 +160,6 @@ def show_dashboard(user):
     ">
         <h3 style="color: {risk_info['color']}; margin-top: 0;">{risk_info['label']}</h3>
         <p><strong>📅 Ngày đánh giá:</strong> {format_date(latest_assessment.get('measured_at'))}</p>
-        <p><strong>📊 Điểm nguy cơ:</strong> {format_risk_score(latest_assessment.get('risk_score', 0))}</p>
         <p style="margin-bottom: 0;">{risk_info['description']}</p>
     </div>
     """, unsafe_allow_html=True)
@@ -84,49 +172,90 @@ def show_dashboard(user):
     
     with col1:
         bmi = metrics.get('BMI', 0)
-        st.metric("BMI", f"{bmi:.1f}" if bmi else "N/A")
+        # Determine BMI category
+        if bmi >= 30:
+            bmi_color = "#ff4444"  # Red - Obese
+            bmi_bg = "#ffebee"
+        elif bmi >= 25:
+            bmi_color = "#ff9800"  # Orange - Overweight
+            bmi_bg = "#fff3e0"
+        elif bmi >= 18.5:
+            bmi_color = "#4caf50"  # Green - Normal
+            bmi_bg = "#e8f5e9"
+        else:
+            bmi_color = "#2196f3"  # Blue - Underweight
+            bmi_bg = "#e3f2fd"
+        
+        st.markdown(f"""
+        <div style="
+            background-color: {bmi_bg};
+            border: 2px solid {bmi_color};
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        ">
+            <p style="margin: 0; color: #666; font-size: 0.9rem;">BMI</p>
+            <h2 style="margin: 0.5rem 0 0 0; color: {bmi_color};">{bmi:.1f}</h2>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.metric("Huyết áp cao", "✓ Có" if metrics.get('HighBP') == 1 else "✗ Không")
+        high_bp = metrics.get('HighBP', 0)
+        bp_color = "#ff4444" if high_bp == 1 else "#4caf50"
+        bp_bg = "#ffebee" if high_bp == 1 else "#e8f5e9"
+        bp_text = "Có" if high_bp == 1 else "Không"
+        
+        st.markdown(f"""
+        <div style="
+            background-color: {bp_bg};
+            border: 2px solid {bp_color};
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        ">
+            <p style="margin: 0; color: #666; font-size: 0.9rem;">Huyết áp cao</p>
+            <h2 style="margin: 0.5rem 0 0 0; color: {bp_color};">{bp_text}</h2>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.metric("Cholesterol cao", "✓ Có" if metrics.get('HighChol') == 1 else "✗ Không")
+        high_chol = metrics.get('HighChol', 0)
+        chol_color = "#ff4444" if high_chol == 1 else "#4caf50"
+        chol_bg = "#ffebee" if high_chol == 1 else "#e8f5e9"
+        chol_text = "Có" if high_chol == 1 else "Không"
+        
+        st.markdown(f"""
+        <div style="
+            background-color: {chol_bg};
+            border: 2px solid {chol_color};
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        ">
+            <p style="margin: 0; color: #666; font-size: 0.9rem;">Cholesterol cao</p>
+            <h2 style="margin: 0.5rem 0 0 0; color: {chol_color};">{chol_text}</h2>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col4:
-        st.metric("Vận động", "✓ Có" if metrics.get('PhysActivity') == 1 else "✗ Không")
-    
-    # Chart if multiple assessments
-    if len(assessments) > 1:
-        st.markdown("---")
-        st.markdown("### 📈 Xu hướng nguy cơ")
+        phys_activity = metrics.get('PhysActivity', 0)
+        activity_color = "#4caf50" if phys_activity == 1 else "#ff4444"
+        activity_bg = "#e8f5e9" if phys_activity == 1 else "#ffebee"
+        activity_text = "Có" if phys_activity == 1 else "Không"
         
-        sorted_assessments = sorted(assessments, key=lambda x: x.get('measured_at', ''))
-        dates = [format_date(a.get('measured_at')) for a in sorted_assessments]
-        scores = [a.get('risk_score', 0) * 100 for a in sorted_assessments]
-        
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=dates, y=scores,
-            mode='lines+markers',
-            name='Điểm nguy cơ',
-            line=dict(color='#1f77b4', width=3),
-            marker=dict(size=10, color=scores, colorscale='RdYlGn_r', showscale=True)
-        ))
-        
-        fig.add_hline(y=50, line_dash="dash", line_color="red", 
-                     annotation_text="Ngưỡng nguy cơ cao (50%)")
-        
-        fig.update_layout(
-            title="Biến đổi điểm nguy cơ theo thời gian",
-            xaxis_title="Ngày đánh giá",
-            yaxis_title="Điểm nguy cơ (%)",
-            height=400,
-            hovermode='x unified',
-            yaxis=dict(range=[0, 100])
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
+        st.markdown(f"""
+        <div style="
+            background-color: {activity_bg};
+            border: 2px solid {activity_color};
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+        ">
+            <p style="margin: 0; color: #666; font-size: 0.9rem;">Vận động</p>
+            <h2 style="margin: 0.5rem 0 0 0; color: {activity_color};">{activity_text}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
     # Quick actions
     st.markdown("---")
     st.markdown("### ⚡ Thao tác nhanh")

@@ -32,21 +32,35 @@ def format_datetime(iso_string):
         return iso_string
 
 def format_date(date_string):
-    """Format ISO date to Vietnamese format"""
+    """Format date to Vietnamese format: HH:MM:SS DD/MM/YYYY"""
     if not date_string:
         return ''
     
     try:
-        # Handle both ISO format and MongoDB ISODate
+        # Handle different date formats
         if isinstance(date_string, str):
-            # Remove 'Z' and parse
-            date_string = date_string.replace('Z', '+00:00')
-            dt = datetime.fromisoformat(date_string)
+            # Try parsing HTTP date format: "Wed, 03 Dec 2025 06:32:49 GMT"
+            try:
+                dt = datetime.strptime(date_string, '%a, %d %b %Y %H:%M:%S %Z')
+            except:
+                # Try ISO format
+                date_string = date_string.replace('Z', '+00:00')
+                dt = datetime.fromisoformat(date_string)
         else:
             dt = date_string
         
-        return dt.strftime('%d/%m/%Y %H:%M')
+        # If datetime is naive (no timezone), assume UTC
+        if dt.tzinfo is None:
+            dt = pytz.UTC.localize(dt)
+        
+        # Convert to Vietnam timezone
+        vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+        dt_vn = dt.astimezone(vn_tz)
+        
+        # Format as HH:MM:SS DD/MM/YYYY
+        return dt_vn.strftime('%H:%M:%S %d/%m/%Y')
     except Exception as e:
+        print(f"Error formatting date: {e}")
         return str(date_string)
 
 def format_risk_score(score):
@@ -58,7 +72,7 @@ def format_risk_score(score):
 
 def get_risk_level_info(risk_level):
     """Get risk level display info"""
-    return RISK_LEVELS.get(risk_level, RISK_LEVELS['low'])
+    return RISK_LEVELS.get(risk_level)
 
 def get_bmi_category(bmi):
     """Get BMI category"""
