@@ -55,9 +55,6 @@ def show_dashboard(user):
         </div>
         """, unsafe_allow_html=True)
     
-    with col3:
-        st.metric("📊 Điểm nguy cơ", format_risk_score(latest_assessment.get('risk_score', 0)))
-    
     # Latest assessment details
     st.markdown("---")
     st.markdown("### 📋 Đánh giá gần nhất")

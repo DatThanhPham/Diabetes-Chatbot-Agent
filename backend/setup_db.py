@@ -1,5 +1,5 @@
 """
-Setup MongoDB Database theo ERD.puml
+Setup MongoDB Database
 Entities: User, Assessment, Message
 """
 import os
@@ -13,11 +13,11 @@ import sys
 load_dotenv()
 
 print("=" * 70)
-print("SETUP DATABASE THEO ERD.puml")
+print("SETUP DATABASE")
 print("=" * 70)
 
 # 1. Connect to MongoDB
-print("\n1️⃣ Connecting to MongoDB Atlas...")
+print("\n 1️Connecting to MongoDB Atlas...")
 try:
     username = quote_plus(os.getenv('DB_USER'))
     password = quote_plus(os.getenv('DB_PASSWORD'))
@@ -25,11 +25,11 @@ try:
     db_name = os.getenv('DB_NAME')
     
     if not all([username, password, cluster, db_name]):
-        print("❌ Missing DB config in .env:")
-        print(f"   DB_USER: {'✓' if username else '✗'}")
-        print(f"   DB_PASSWORD: {'✓' if password else '✗'}")
-        print(f"   DB_CLUSTER: {'✓' if cluster else '✗'}")
-        print(f"   DB_NAME: {'✓' if db_name else '✗'}")
+        print("Missing DB config in .env:")
+        print(f"   DB_USER: {'yes' if username else 'no'}")
+        print(f"   DB_PASSWORD: {'yes' if password else 'no'}")
+        print(f"   DB_CLUSTER: {'yes' if cluster else 'no'}")
+        print(f"   DB_NAME: {'yes' if db_name else 'no'}")
         sys.exit(1)
     
     connection_string = (
@@ -41,26 +41,26 @@ try:
     client.admin.command('ping')
     
     db = client[db_name]
-    print(f"   ✅ Connected to database: {db_name}")
-    print(f"   ✅ Cluster: {cluster}")
+    print(f"Connected to database: {db_name}")
+    print(f"Cluster: {cluster}")
     
 except Exception as e:
-    print(f"   ❌ Connection failed: {e}")
+    print(f"Connection failed: {e}")
     sys.exit(1)
 
 # 2. Clean existing collections (optional)
-print("\n2️⃣ Cleaning existing data...")
-response = input("   ⚠️  Drop all existing collections? (y/n): ")
+print("\n2️Cleaning existing data...")
+response = input("Drop all existing collections? (y/n): ")
 
 if response.lower() == 'y':
     for collection in db.list_collection_names():
         db[collection].drop()
-        print(f"   ✅ Dropped: {collection}")
+        print(f"Dropped: {collection}")
 else:
-    print("   ℹ️  Keeping existing data")
+    print("Keeping existing data")
 
 # 3. Create Collections with Validation Schema
-print("\n3️⃣ Creating collections with validation schemas...")
+print("\n 3️ Creating collections with validation schemas...")
 
 # =============================================================================
 # ENTITY: User
@@ -87,17 +87,17 @@ try:
             }
         }
     })
-    print(f"      ✅ Created 'users' with schema validation")
+    print(f"Created 'users' with schema validation")
 except Exception as e:
     if 'already exists' in str(e):
-        print(f"      ℹ️  Collection already exists")
+        print(f"Collection already exists")
     else:
-        print(f"      ⚠️  Error: {e}")
+        print(f"Error: {e}")
 
 # =============================================================================
 # ENTITY: Assessment
 # =============================================================================
-print("\n   📁 Creating 'assessments' collection...")
+print("\n Creating 'assessments' collection...")
 try:
     db.create_collection('assessments', validator={
         '$jsonSchema': {
@@ -175,17 +175,17 @@ try:
             }
         }
     })
-    print(f"      ✅ Created 'assessments' with schema validation")
+    print(f"Created 'assessments' with schema validation")
 except Exception as e:
     if 'already exists' in str(e):
-        print(f"      ℹ️  Collection already exists")
+        print(f"Collection already exists")
     else:
-        print(f"      ⚠️  Error: {e}")
+        print(f"Error: {e}")
 
 # =============================================================================
 # ENTITY: Message
 # =============================================================================
-print("\n   📁 Creating 'messages' collection...")
+print("\n Creating 'messages' collection...")
 try:
     db.create_collection('messages', validator={
         '$jsonSchema': {
@@ -215,53 +215,53 @@ try:
             }
         }
     })
-    print(f"      ✅ Created 'messages' with schema validation")
+    print(f"Created 'messages' with schema validation")
 except Exception as e:
     if 'already exists' in str(e):
-        print(f"      ℹ️  Collection already exists")
+        print(f"Collection already exists")
     else:
-        print(f"      ⚠️  Error: {e}")
+        print(f"Error: {e}")
 
 # 4. Create Indexes for Performance
-print("\n4️⃣ Creating indexes for performance...")
+print("\n4️ Creating indexes for performance...")
 
 # Users indexes
-print("\n   📌 Users indexes:")
+print("\n Users indexes:")
 db.users.create_index("name", unique=True, name="idx_username_unique")
-print(f"      ✅ name (unique)")
+print(f"name (unique)")
 db.users.create_index("created_at", name="idx_user_created")
-print(f"      ✅ created_at")
+print(f"created_at")
 
 # Assessments indexes
-print("\n   📌 Assessments indexes:")
+print("\n Assessments indexes:")
 db.assessments.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)], name="idx_user_assessments_time")
-print(f"      ✅ user_id + created_at (DESC) - for getting latest assessments")
+print(f"user_id + created_at (DESC) - for getting latest assessments")
 
 db.assessments.create_index([("user_id", ASCENDING), ("is_valid", ASCENDING)], name="idx_user_valid_assessments")
-print(f"      ✅ user_id + is_valid - for getting valid assessment")
+print(f"user_id + is_valid - for getting valid assessment")
 
 db.assessments.create_index("is_valid", name="idx_valid_filter")
-print(f"      ✅ is_valid - for filtering")
+print(f"is_valid - for filtering")
 
 db.assessments.create_index("measured_at", name="idx_measurement_time")
-print(f"      ✅ measured_at - for time-based queries")
+print(f"measured_at - for time-based queries")
 
 # Messages indexes
-print("\n   📌 Messages indexes:")
+print("\n Messages indexes:")
 db.messages.create_index([("assessment_id", ASCENDING), ("created_at", ASCENDING)], name="idx_assessment_messages")
-print(f"      ✅ assessment_id + created_at - for chat history")
+print(f"assessment_id + created_at - for chat history")
 
 db.messages.create_index("created_at", name="idx_message_time")
-print(f"      ✅ created_at - for sorting")
+print(f"created_at - for sorting")
 
 db.messages.create_index("sender_type", name="idx_sender_filter")
-print(f"      ✅ sender_type - for filtering")
+print(f"sender_type - for filtering")
 
 # 5. Insert Sample Data
-print("\n5️⃣ Inserting sample data...")
+print("\n5️ Inserting sample data...")
 
 # Sample Users
-print("\n   👤 Creating sample users...")
+print("\nCreating sample users...")
 sample_users = [
     {
         'name': 'admin',
@@ -280,18 +280,18 @@ for user in sample_users:
     try:
         result = db.users.insert_one(user)
         user_ids[user['name']] = str(result.inserted_id)
-        print(f"      ✅ Created user: {user['name']}")
+        print(f"Created user: {user['name']}")
     except Exception as e:
         if 'duplicate key' in str(e):
             existing = db.users.find_one({'name': user['name']})
             user_ids[user['name']] = str(existing['_id'])
-            print(f"      ℹ️  User exists: {user['name']}")
+            print(f"User exists: {user['name']}")
         else:
-            print(f"      ⚠️  Error: {e}")
+            print(f"Error: {e}")
 
 # Sample Assessments for demo_user
 if 'demo_user' in user_ids:
-    print("\n   📊 Creating sample assessments...")
+    print("\nCreating sample assessments...")
     
     # Assessment 1: Valid (most recent)
     assessment1 = {
@@ -451,7 +451,7 @@ print(f"      Assessments: {assessments_count} documents ({valid_assessments} va
 print(f"      Messages: {messages_count} documents ({linked_messages} linked to assessments)")
 
 # List indexes
-print(f"\n   📌 Index Summary:")
+print(f"\nIndex Summary:")
 for coll_name in ['users', 'assessments', 'messages']:
     indexes = list(db[coll_name].list_indexes())
     print(f"      {coll_name}: {len(indexes)} indexes")
@@ -460,7 +460,7 @@ for coll_name in ['users', 'assessments', 'messages']:
             print(f"         - {idx['name']}")
 
 # 7. Test Business Rule: Only 1 valid assessment per user
-print("\n7️⃣ Testing Business Rule: Only 1 valid assessment...")
+print("\n7️ Testing Business Rule: Only 1 valid assessment...")
 if 'demo_user' in user_ids:
     valid_assessments = list(db.assessments.find({
         'user_id': user_ids['demo_user'],
@@ -468,38 +468,38 @@ if 'demo_user' in user_ids:
     }))
     
     if len(valid_assessments) == 1:
-        print(f"   ✅ PASS: Only 1 valid assessment found")
+        print(f"PASS: Only 1 valid assessment found")
         print(f"      Assessment ID: {valid_assessments[0]['_id']}")
         print(f"      Measured at: {valid_assessments[0]['measured_at']}")
     else:
-        print(f"   ❌ FAIL: Found {len(valid_assessments)} valid assessments (should be 1)")
+        print(f"FAIL: Found {len(valid_assessments)} valid assessments (should be 1)")
 
 # 8. Summary
 print("\n" + "=" * 70)
-print("✅ DATABASE SETUP COMPLETED - THEO ERD.puml")
+print("DATABASE SETUP COMPLETED - THEO ERD.puml")
 print("=" * 70)
 
 print(f"""
-📁 Database: {db_name}
-🌐 Cluster: {cluster}
+Database: {db_name}
+Cluster: {cluster}
 
-📊 Collections Created:
-   ✓ users - {users_count} documents
-   ✓ assessments - {assessments_count} documents ({valid_assessments} valid)
-   ✓ messages - {messages_count} documents ({linked_messages} assessment-linked)
+Collections Created:
+   users - {users_count} documents
+   assessments - {assessments_count} documents ({valid_assessments} valid)
+   messages - {messages_count} documents ({linked_messages} assessment-linked)
 
-📌 Indexes: Total {sum(len(list(db[c].list_indexes())) for c in ['users', 'assessments', 'messages'])} indexes
+Indexes: Total {sum(len(list(db[c].list_indexes())) for c in ['users', 'assessments', 'messages'])} indexes
 
-👤 Sample Accounts:
+Sample Accounts:
    • admin / admin123
    • demo_user / demo123
 
-✅ Business Rules Implemented:
+Business Rules Implemented:
    • Only 1 valid assessment per user at a time
    • Messages can be linked to assessment (optional)
    • Assessment has metrics + prediction subdocuments
 
-🚀 Next Steps:
+Next Steps:
    1. Start backend: python app.py
    2. Test login: POST /api/users/login
    3. View data: MongoDB Atlas → Browse Collections

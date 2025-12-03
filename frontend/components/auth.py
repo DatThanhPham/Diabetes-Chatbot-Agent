@@ -1,9 +1,21 @@
 """
 Authentication components
 """
+import base64
+import os
 import streamlit as st
 from services.auth_service import register_user, login_user
 from utils.session_state import set_user
+
+def get_base64_image(image_path):
+    """Convert image to base64"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception as e:
+        print(f"Không thể load ảnh: {e}")
+        return None
+
 
 def show_login_form():
     """Display login form"""
@@ -13,8 +25,8 @@ def show_login_form():
         username = st.text_input("Tên đăng nhập", key="login_username")
         password = st.text_input("Mật khẩu", type="password", key="login_password")
         
-        col1, col2 = st.columns([1, 3])
-        with col1:
+        col1, col2, col3 = st.columns([1, 3, 1  ])
+        with col2:
             submit = st.form_submit_button("Đăng nhập", use_container_width=True)
         
         if submit:
@@ -85,30 +97,108 @@ def show_register_form():
 def show_auth_page():
     """Display authentication page with tabs"""
     
+    # Get background image
+    image_path = os.path.join(os.path.dirname(__file__), "..", "assets", "background.jpg")
+    base64_image = get_base64_image(image_path)
+    
+    # Custom CSS for background and styling
+    background_css = f"""
+    <style>
+    /* Background image */
+    .stApp {{
+        background-image: url('data:image/jpeg;base64,{base64_image}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    
+    /* Make ALL containers transparent */
+    .main {{
+        background-color: transparent !important;
+    }}
+    
+    .block-container {{
+        background-color: transparent !important;
+        padding-top: 2rem;
+    }}
+    
+    [data-testid="stVerticalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    [data-testid="stHorizontalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.3);
+        z-index: 0;
+        pointer-events: none;
+    }}
+    
+    .main > div {{
+        position: relative;
+        z-index: 1;
+    }}
+    
+    .stTabs [data-baseweb="tab-panel"] {{
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }}
+    
+    .stTabs {{
+        background-color: transparent !important;
+    }}
+    
+    [data-baseweb="tab-list"] {{
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border-radius: 10px 10px 0 0;
+        padding: 0.5rem;
+    }}
+    
+    .element-container {{
+        background-color: transparent !important;
+    }}
+    </style>
+    """ if base64_image else ""
+    
+    st.markdown(background_css, unsafe_allow_html=True)
+    
     # Header
     st.markdown("""
-    <div style="text-align: center; padding: 2rem 0;">
-        <h1 style="color: #1f77b4; font-size: 3rem; margin-bottom: 0.5rem;">
+    <div style="text-align: center; padding: 2rem 0; position: relative; z-index: 1;">
+        <h1 style="color: #1f77b4; font-size: 3rem; margin-bottom: 0.5rem; text-shadow: 2px 2px 4px rgba(255,255,255,0.8);">
             🏥 Diabetes Chatbot Agent
         </h1>
-        <p style="color: #666; font-size: 1.2rem;">
+        <p style="color: #333; font-size: 1.2rem; text-shadow: 1px 1px 2px rgba(255,255,255,0.8);">
             Hệ thống tư vấn và dự đoán nguy cơ tiểu đường
+        </p>
+        <p style="color: #333; font-size: 1.2rem; font-weight: bold; text-shadow: 1px 1px 2px rgba(255,255,255,0.8);">
+            Nhóm Cloud Djata
         </p>
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("---")
+    # Center container with max width
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
     
-    tab1, tab2 = st.tabs(["🔐 Đăng nhập", "📝 Đăng ký"])
-    
-    with tab1:
-        show_login_form()
+    with col3:
+        tab1, tab2 = st.tabs(["🔐 Đăng nhập", "📝 Đăng ký"])
         
-        st.markdown("---")
-        st.info("💡 **Tài khoản demo:**\n- Username: `demo_user`\n- Password: `demo123`")
-    
-    with tab2:
-        show_register_form()
+        with tab1:
+            show_login_form()
         
-        st.markdown("---")
-        st.info("ℹ️ Sau khi đăng ký, bạn sẽ được tự động đăng nhập.")
+        with tab2:
+            show_register_form()
+            
+            st.markdown("---")
+            st.info("ℹ️ Sau khi đăng ký, bạn sẽ được tự động đăng nhập.")
