@@ -16,7 +16,6 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=2)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
     
-    # Đã xóa SECRET_KEY, JWT_SECRET_KEY, SQLALCHEMY_DATABASE_URI
     GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
     KNOWLEDGE_FILE_IDS = os.environ.get('KNOWLEDGE_FILE_IDS')
     MODEL_DIR = os.path.join(os.path.dirname(__file__), '..', '../models')

@@ -69,7 +69,6 @@ def create_app():
                 "rag_flow": {
                     "analyze_risk": "POST /api/analyze_risk",
                     "get_advice": "POST /api/get_advice",
-                    "chat_with_rag": "POST /api/chat_with_rag"
                 }
             }
         }, 200
