@@ -47,14 +47,14 @@ class DiabetesPredictor:
             self.scaler = joblib.load(scaler_path)
             self.is_loaded = True
             
-            print("✅ Model loaded successfully!")
+            print("Model loaded successfully!")
             print(f"   - Model type: {type(self.model).__name__}")
             print(f"   - Features: {len(self.columns_order)}")
             print(f"   - Categorical: {len(self.categorical_cols)}")
             print(f"   - Numerical: {len(self.numerical_cols)}")
             
         except Exception as e:
-            print(f"❌ Lỗi khi tải model: {e}")
+            print(f"Lỗi khi tải model: {e}")
             self.is_loaded = False
             raise
 
@@ -112,7 +112,7 @@ class DiabetesPredictor:
             return int(prediction[0])
             
         except Exception as e:
-            print(f"❌ Prediction error: {e}")
+            print(f"Prediction error: {e}")
             raise
     
     def predict_proba(self, form_data):
@@ -140,7 +140,7 @@ class DiabetesPredictor:
                     "high_risk": 1.0 if prediction == 1 else 0.0
                 }
         except Exception as e:
-            print(f"❌ Probability error: {e}")
+            print(f"Probability error: {e}")
             raise
     
     def get_model_info(self):
@@ -157,7 +157,7 @@ class DiabetesPredictor:
 # Tạo instance toàn cục
 try:
     predictor = DiabetesPredictor()
-    print("✅ Predictor initialized successfully")
+    print("Predictor initialized successfully")
 except Exception as e:
     print(f"⚠ Warning: Predictor initialization failed: {e}")
     print("⚠ Server will start but predictions may not work")

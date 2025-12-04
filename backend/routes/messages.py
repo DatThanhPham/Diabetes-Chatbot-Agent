@@ -102,7 +102,7 @@ def get_rag_content():
             file_obj = genai.get_file(file_id)
             rag_files.append(file_obj)
         except Exception as e:
-            print(f"Error fetching RAG file {file_id}: {e}")
+            current_app.logger.warning(f"Error fetching RAG file {file_id}: {e}")
     
     _rag_cache['files'] = tuple(rag_files)
     _rag_cache['timestamp'] = now
