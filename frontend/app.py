@@ -138,17 +138,17 @@ init_session_state()
 def main():
     """Main application"""
     
-    # # Check authentication
-    # if not is_logged_in():
-    #     show_auth_page()
-    #     return
+    # Check authentication
+    if not is_logged_in():
+        show_auth_page()
+        return
     
-    # user = get_user()
+    user = get_user()
 
-    user = {
-        "id": "692c1c7b48e77a615327f0df",
-        "name": "Nguyễn Văn A",
-    }
+    # user = {
+    #     "id": "692c1c7b48e77a615327f0df",
+    #     "name": "Nguyễn Văn A",
+    # }
     
     # Sidebar
     with st.sidebar:

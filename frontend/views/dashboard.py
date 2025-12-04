@@ -5,7 +5,6 @@ import streamlit as st
 from services.assessment_service import get_user_assessments
 from utils.helpers import get_risk_level_info, format_date, format_risk_score
 from utils.session_state import navigate_to
-import plotly.graph_objects as go
 import base64
 import os
 

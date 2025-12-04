@@ -1,19 +1,36 @@
+import time
 from flask import Blueprint, request, jsonify, current_app
 from predict.validation import validate_health_form
 from predict.predict_model import predictor
 from services.assessment_service import create_assessment, get_assessment_by_id
 from services.message_service import create_message
 import google.generativeai as genai
-import traceback  # ✅ FIX 1: THÊM IMPORT
+import traceback 
 
 bp = Blueprint('app_routes', __name__, url_prefix='/api')
 
+_rag_cache = {
+    'files': None,
+    'timestamp': None,
+    'ttl': 3600  # Cache 1 hour
+}
+
 def get_rag_content():
-    """Lấy danh sách File Reference từ ID đã cấu hình"""
+    """Lấy danh sách File Reference từ ID đã cấu hình (cached with TTL)"""
+    now = time.time()
+    
+    # Check if cache is valid
+    if (_rag_cache['files'] is not None and 
+        _rag_cache['timestamp'] is not None and 
+        now - _rag_cache['timestamp'] < _rag_cache['ttl']):
+        current_app.logger.info("Using cached RAG files")
+        return _rag_cache['files']
+    
+    # Load fresh files
     file_ids_str = current_app.config.get('KNOWLEDGE_FILE_IDS')
     if not file_ids_str:
         current_app.logger.warning("KNOWLEDGE_FILE_IDS not configured")
-        return []
+        return tuple()
     
     file_id_list = [fid.strip() for fid in file_ids_str.split(',') if fid.strip()]
     rag_files = []
@@ -26,7 +43,12 @@ def get_rag_content():
         except Exception as e:
             current_app.logger.error(f"Error loading file {fid}: {e}")
     
-    return rag_files
+    # Update cache
+    _rag_cache['files'] = tuple(rag_files)
+    _rag_cache['timestamp'] = now
+    current_app.logger.info(f"Cached {len(rag_files)} RAG files")
+    
+    return _rag_cache['files']
 
 def generate_response_with_files(prompt_text):
     """Gọi Gemini với Prompt và Danh sách File"""
@@ -36,11 +58,27 @@ def generate_response_with_files(prompt_text):
             return "Hệ thống chưa tải được tài liệu kiến thức. Vui lòng kiểm tra cấu hình."
 
         model = genai.GenerativeModel('gemini-2.0-flash')
-        content_to_send = [prompt_text] + rag_files
+        content_to_send = [prompt_text] + list(rag_files)
         response = model.generate_content(content_to_send)
         return response.text
     except Exception as e:
+        error_msg = str(e)
         current_app.logger.error(f"Gemini error: {e}")
+        
+        if '429' in error_msg or 'Resource exhausted' in error_msg:
+            current_app.logger.warning(f"Rate limit hit: {e}")
+            return """
+⏳ **Hệ thống đang bận, vui lòng thử lại sau ít phút.**
+
+Nguyên nhân: Đã vượt quá giới hạn số lượng yêu cầu.
+
+Trong lúc chờ, bạn có thể:
+• Xem lại kết quả đánh giá của mình
+• Đọc các lời khuyên đã được lưu trước đó
+• Thử lại sau 2-3 phút
+
+"""
+        
         return "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau."
 
 def build_profile_text(record):
@@ -86,24 +124,10 @@ def build_profile_text(record):
     age_text = age_map.get(int(data.get('Age', 0)), "N/A")
     
     return f"""
-╔══════════════════════════════════════════════════════════════╗
-║           THÔNG TIN HỒ SƠ SỨC KHỎE BỆNH NHÂN                ║
-╚══════════════════════════════════════════════════════════════╝
-
-📊 KẾT QUẢ ĐÁNH GIÁ: {pred_text}
-   • Mức độ rủi ro: {risk_level.upper()}
-
-👤 THÔNG TIN CƠ BẢN:
-   • Giới tính: {'Nam' if data.get('Sex')==1.0 else 'Nữ'}
-   • Nhóm tuổi: {age_text}
-   • BMI: {data.get('BMI', 'N/A')}
-
-⚠️ CÁC YẾU TỐ RỦI RO:
-   {risk_text}
-
-💊 TÌNH TRẠNG SỨC KHỎE:
-   • Số ngày không khỏe (thể chất): {int(data.get('PhysHlth', 0))} ngày/30 ngày
-   • Số ngày không khỏe (tâm thần): {int(data.get('MentHlth', 0))} ngày/30 ngày
+HỒ SƠ: {pred_text} ({risk_level})
+Tuổi: {age_text} | Giới: {'Nam' if data.get('Sex')==1.0 else 'Nữ'} | BMI: {data.get('BMI', 'N/A')}
+Rủi ro: {risk_text}
+SứcKhỏe: ThểChất {int(data.get('PhysHlth', 0))}/30 ngày, TâmThần {int(data.get('MentHlth', 0))}/30 ngày
 """
 
 @bp.route('/analyze_risk', methods=['POST'])
@@ -176,12 +200,12 @@ Dựa CHÍNH XÁC vào các tài liệu đính kèm, hãy đưa ra lời khuyên
 {profile_txt}
 
 Yêu cầu phản hồi:
-1. 💬 **Thông báo kết quả** một cách cảm thông và dễ hiểu
-2. 🎯 **Giải thích ngắn gọn** về các yếu tố rủi ro liên quan
-3. ✅ **3-5 hành động cụ thể** cần làm ngay (thực tế, khả thi)
-4. 🥗 **Chế độ ăn uống** phù hợp (thực phẩm nên ăn/tránh)
-5. 🏃 **Hoạt động thể chất** phù hợp (loại hình, tần suất, thời lượng)
-6. 🏥 **Lời khuyên về khám bác sĩ** (khi nào, xét nghiệm gì)
+1. **Thông báo kết quả** một cách cảm thông và dễ hiểu
+2. **Giải thích ngắn gọn** về các yếu tố rủi ro liên quan
+3. **3-5 hành động cụ thể** cần làm ngay (thực tế, khả thi)
+4. **Chế độ ăn uống** phù hợp (thực phẩm nên ăn/tránh)
+5. **Hoạt động thể chất** phù hợp (loại hình, tần suất, thời lượng)
+6. **Lời khuyên về khám bác sĩ** (khi nào, xét nghiệm gì)
 
 Hãy viết bằng tiếng Việt, dễ hiểu, thân thiện và có emoji để dễ đọc!
 """
@@ -190,7 +214,6 @@ Hãy viết bằng tiếng Việt, dễ hiểu, thân thiện và có emoji đ�
         advice = generate_response_with_files(prompt)
         current_app.logger.info(f"✅ Advice generated: {len(advice)} chars")
 
-        # ✅ FIX 2: Save to DB if user_id provided
         assessment_id = None
         if user_id:
             try:
@@ -211,12 +234,10 @@ Hãy viết bằng tiếng Việt, dễ hiểu, thân thiện và có emoji đ�
                 
                 current_app.logger.info(f"📝 create_assessment result: {result}")
                 
-                # ✅ FIX 3: Kiểm tra result đúng cách
                 if result.get('success'):
                     assessment_id = result['data']['id']
                     current_app.logger.info(f"✅ Assessment created: {assessment_id}")
                     
-                    # ✅ FIX 4: Save initial advice message
                     msg_result = create_message(
                         assessment_id=assessment_id,
                         sender_type='agent',
@@ -238,7 +259,6 @@ Hãy viết bằng tiếng Việt, dễ hiểu, thân thiện và có emoji đ�
                 current_app.logger.error(traceback.format_exc())
                 # Continue anyway - advice is still valid
 
-        # ✅ FIX 5: Return advice
         current_app.logger.info(f"📤 Returning advice: assessment_id={assessment_id}")
         
         return jsonify({

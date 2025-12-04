@@ -6,12 +6,14 @@ from services.assessment_service import analyze_risk
 from components.risk_result_dialog import show_risk_result_dialog
 from utils.helpers import calculate_bmi, validate_bmi
 from utils.session_state import set_assessment_result
+import base64
+import os
 
 # Constants
-AGE_OPTIONS = [
-    '18-24 tuổi', '25-29 tuổi', '30-34 tuổi', '35-39 tuổi', '40-44 tuổi',
-    '45-49 tuổi', '50-54 tuổi', '55-59 tuổi', '60-64 tuổi', '65-69 tuổi',
-    '70-74 tuổi', '75-79 tuổi', '80+ tuổi'
+AGE_RANGES = [
+    (18, 24), (25, 29), (30, 34), (35, 39), (40, 44),
+    (45, 49), (50, 54), (55, 59), (60, 64), (65, 69),
+    (70, 74), (75, 79), (80, 120)
 ]
 
 SEX_OPTIONS = ['Nam', 'Nữ']
@@ -33,23 +35,121 @@ INCOME_OPTIONS = [
 
 GENHLTH_OPTIONS = ['Xuất sắc', 'Rất tốt', 'Khá tốt', 'Trung bình', 'Kém']
 
+def get_base64_image(image_path):
+    """Convert image to base64"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception as e:
+        print(f"Không thể load ảnh: {e}")
+        return None
+
+def map_age_to_group(age):
+    """Map age to group index (1-13)"""
+    for idx, (min_age, max_age) in enumerate(AGE_RANGES, 1):
+        if min_age <= age <= max_age:
+            return idx
+    return 1  # Default to first group
+
 def show_assessment_form(user):
     """Display assessment form with improved UX"""
     
-    st.markdown('<h1 style="text-align: center; color: #1f77b4;">📝 Đánh Giá Sức Khỏe</h1>', unsafe_allow_html=True)
+    # Get background image
+    image_path = os.path.join(os.path.dirname(__file__), "..", "assets", "background.jpg")
+    base64_image = get_base64_image(image_path)
+    
+    # Custom CSS for background and styling
+    background_css = f"""
+    <style>
+    /* Background image */
+    .stApp {{
+        background-image: url('data:image/jpeg;base64,{base64_image}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    
+    /* Make containers transparent */
+    .main {{
+        background-color: transparent !important;
+    }}
+    
+    .block-container {{
+        background-color: transparent !important;
+        padding-top: 2rem;
+    }}
+    
+    [data-testid="stVerticalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    [data-testid="stHorizontalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    /* Add overlay for better readability */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.5);
+        z-index: 0;
+        pointer-events: none;
+    }}
+    
+    .main > div {{
+        position: relative;
+        z-index: 1;
+    }}
+    
+    /* Style form */
+    .stForm {{
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }}
+    
+    /* Health option cards */
+    .health-option {{
+        background-color: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }}
+    
+    .health-option:hover {{
+        border-color: #667eea;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }}
+    
+    .health-option.selected {{
+        border-color: #667eea;
+        background: linear-gradient(135deg, #667eea22 0%, #764ba222 100%);
+    }}
+    </style>
+    """ if base64_image else ""
+    
+    st.markdown(background_css, unsafe_allow_html=True)
+    
+    st.markdown('<h1 style="text-align: center; color: #1f77b4; text-shadow: 2px 2px 4px rgba(255,255,255,0.8);">📝 Đánh Giá Sức Khỏe</h1>', unsafe_allow_html=True)
     st.markdown("---")
     
     # ✅ Check if we have prediction result -> show dialog
     if 'prediction_result' in st.session_state:
-        # ✅ FIX: Just show dialog, let it handle the button click
         show_risk_result_dialog(st.session_state.prediction_result)
         
-        # ✅ Button to do new assessment
         st.markdown("<br>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
             if st.button("🔄 Đánh giá lại", key="new_assessment", use_container_width=True):
-                # Clear previous result
                 del st.session_state.prediction_result
                 if 'advice_requested' in st.session_state:
                     del st.session_state.advice_requested
@@ -59,7 +159,7 @@ def show_assessment_form(user):
         
         return
     
-    # ✅ Original form (if no prediction result)
+    # ✅ Original form
     st.info("📋 Vui lòng điền đầy đủ thông tin sức khỏe của bạn")
     
     with st.form("health_assessment_form"):
@@ -67,7 +167,9 @@ def show_assessment_form(user):
         col1, col2 = st.columns(2)
         
         with col1:
-            age = st.selectbox("🎂 Nhóm tuổi", options=AGE_OPTIONS, index=5)
+            age_input = st.number_input("🎂 Tuổi", min_value=18, max_value=120, step=1)
+            age_group = map_age_to_group(age_input)
+            
             sex = st.selectbox("⚧️ Giới tính", options=SEX_OPTIONS, index=0)
         
         with col2:
@@ -115,16 +217,37 @@ def show_assessment_form(user):
         st.markdown("---")
         st.markdown("### 🍎 Sức khỏe tổng quát")
         
-        col1, col2, col3 = st.columns(3)
+        # General Health - Radio buttons instead of slider
+        st.markdown("**💪 Sức khỏe chung**")
+        gen_hlth = st.radio(
+            "Đánh giá sức khỏe tổng quát của bạn:",
+            options=GENHLTH_OPTIONS,
+            horizontal=True,
+            index=2,
+            label_visibility="collapsed"
+        )
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
         
         with col1:
-            gen_hlth = st.select_slider("💪 Sức khỏe chung", options=GENHLTH_OPTIONS, value="Khá tốt")
+            ment_hlth = st.number_input(
+                "🧠 Số ngày sức khỏe tâm thần không tốt (30 ngày)",
+                min_value=0,
+                max_value=30,
+                value=0,
+                step=1
+            )
         
         with col2:
-            ment_hlth = st.slider("🧠 Số ngày sức khỏe tâm thần không tốt (30 ngày)", min_value=0, max_value=30, value=0)
-        
-        with col3:
-            phys_hlth = st.slider("🤕 Số ngày sức khỏe thể chất không tốt (30 ngày)", min_value=0, max_value=30, value=0)
+            phys_hlth = st.number_input(
+                "🤕 Số ngày sức khỏe thể chất không tốt (30 ngày)",
+                min_value=0,
+                max_value=30,
+                value=0,
+                step=1
+            )
         
         diff_walk = st.checkbox("🚶 Khó khăn khi đi bộ hoặc leo cầu thang")
         
@@ -153,7 +276,7 @@ def show_assessment_form(user):
                 'PhysHlth': float(phys_hlth),
                 'DiffWalk': 1.0 if diff_walk else 0.0,
                 'Sex': 1.0 if sex == "Nam" else 0.0,
-                'Age': float(AGE_OPTIONS.index(age) + 1),
+                'Age': float(age_group),
                 'Education': float(EDUCATION_OPTIONS.index(education) + 1),
                 'Income': float(INCOME_OPTIONS.index(income) + 1)
             }
@@ -163,7 +286,6 @@ def show_assessment_form(user):
                 result = analyze_risk(form_data)
             
             if result['success']:
-                # Store result in session -> will trigger dialog on rerun
                 st.session_state.prediction_result = result['data']
                 st.rerun()
             else:

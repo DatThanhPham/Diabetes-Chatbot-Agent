@@ -4,16 +4,101 @@ Chatbot View - AI conversation with streaming
 import streamlit as st
 import time
 import traceback
+import base64
+import os
 
 from services.assessment_service import get_user_assessments, get_assessment_by_id
 from services.chat_service import send_message, get_messages_by_assessment
 from utils.helpers import format_date, get_risk_level_info, format_risk_score
 from utils.session_state import get_current_assessment_id, set_current_assessment_id
 
+def get_base64_image(image_path):
+    """Convert image to base64"""
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode()
+    except Exception as e:
+        print(f"Không thể load ảnh: {e}")
+        return None
+
 def show_chatbot(user):
     """Display chatbot interface with Gemini-like UI and streaming"""
     
-    st.markdown('<h1 style="text-align: center; color: #1f77b4;">💬 Chatbot AI</h1>', unsafe_allow_html=True)
+    # Get background image
+    image_path = os.path.join(os.path.dirname(__file__), "..", "assets", "background.jpg")
+    base64_image = get_base64_image(image_path)
+    
+    # Custom CSS for background and styling
+    background_css = f"""
+    <style>
+    /* Background image */
+    .stApp {{
+        background-image: url('data:image/jpeg;base64,{base64_image}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    
+    /* Make containers transparent */
+    .main {{
+        background-color: transparent !important;
+    }}
+    
+    .block-container {{
+        background-color: transparent !important;
+        padding-top: 2rem;
+    }}
+    
+    [data-testid="stVerticalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    [data-testid="stHorizontalBlock"] {{
+        background-color: transparent !important;
+    }}
+    
+    /* Add overlay for better readability */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.3);
+        z-index: 0;
+        pointer-events: none;
+    }}
+    
+    .main > div {{
+        position: relative;
+        z-index: 1;
+    }}
+    
+    /* Style for content */
+    .element-container {{
+        background-color: transparent !important;
+    }}
+    
+    /* Chat input styling */
+    .stChatInput {{
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        border-radius: 25px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    }}
+    
+    /* Animation for typing indicator */
+    @keyframes wave {{
+        0%, 60%, 100% {{ transform: translateY(0); }}
+        30% {{ transform: translateY(-10px); }}
+    }}
+    </style>
+    """ if base64_image else ""
+    
+    st.markdown(background_css, unsafe_allow_html=True)
+    
+    st.markdown('<h1 style="text-align: center; color: #1f77b4; text-shadow: 2px 2px 4px rgba(255,255,255,0.8);">💬 Chatbot AI</h1>', unsafe_allow_html=True)
     st.markdown("---")
     
     # ✅ CHECK: If user came from assessment form with advice request
@@ -53,10 +138,10 @@ def show_chatbot(user):
                     if i % 10 == 0 or i == len(advice) - 1:
                         advice_placeholder.markdown(f"""
                         <div style="
-                            background: white;
+                            background: rgba(255, 255, 255, 0.95);
                             border-radius: 18px;
                             padding: 1.5rem;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                             line-height: 1.8;
                         ">
                             {streamed_text}
@@ -109,7 +194,40 @@ def show_chatbot(user):
         current_assessment_id = valid_assessments[0]['id']
         set_current_assessment_id(current_assessment_id)
     
-    # Get full assessment
+    # ✅ Assessment selector - Show list of assessments
+    st.markdown("### 📋 Chọn đánh giá để xem lịch sử chat")
+    
+    # Create columns for assessment cards
+    cols = st.columns(min(len(valid_assessments), 3))
+    
+    for idx, assessment in enumerate(valid_assessments):
+        col_idx = idx % 3
+        with cols[col_idx]:
+            assessment_id = assessment['id']
+            measured_at = assessment.get('measured_at', '')
+            prediction = assessment.get('prediction', {})
+            risk_level = prediction.get('risk_level', 'low')
+            risk_info = get_risk_level_info(risk_level)
+            
+            # Check if this is current assessment
+            is_current = assessment_id == current_assessment_id
+            border_color = risk_info['color'] if is_current else "#e0e0e0"
+            bg_opacity = "0.95" if is_current else "0.85"
+            
+            # Display as clickable card
+            if st.button(
+                f"{'🔹' if is_current else '⚪'} {format_date(measured_at)}\n{risk_info['label']}",
+                key=f"select_assessment_{assessment_id}",
+                use_container_width=True,
+                type="primary" if is_current else "secondary"
+            ):
+                if not is_current:
+                    set_current_assessment_id(assessment_id)
+                    st.rerun()
+    
+    st.markdown("---")
+    
+    # Get full assessment for current selection
     assessment_result = get_assessment_by_id(current_assessment_id)
     if not assessment_result['success']:
         st.error("❌ Không thể tải assessment")
@@ -137,10 +255,10 @@ def show_chatbot(user):
         padding: 1.5rem;
         border-radius: 12px;
         margin-bottom: 1.5rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     ">
         <h3 style="margin: 0; color: {risk_info['color']};">
-            📊 Đánh giá hiện tại: {risk_info['label']}
+            📊 Đánh giá đang xem: {risk_info['label']}
         </h3>
         <p style="margin: 0.5rem 0 0 0; color: #666;">
             🕐 {format_date(measured_at)} | 📊 Điểm nguy cơ: {format_risk_score(risk_score)}
@@ -148,7 +266,7 @@ def show_chatbot(user):
     </div>
     """, unsafe_allow_html=True)
     
-    # Load chat history
+    # Load chat history for selected assessment
     messages_result = get_messages_by_assessment(current_assessment_id)
     
     if messages_result['success']:
@@ -168,11 +286,12 @@ def show_chatbot(user):
             if sender_type == 'user':
                 st.markdown(f"""
                 <div style="
-                    background: #f1f3f4;
+                    background: rgba(241, 243, 244, 0.95);
                     border-radius: 18px;
                     padding: 1rem 1.5rem;
                     margin: 0.5rem 0 0.5rem auto;
                     max-width: 80%;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
                 ">
                     <p style="margin: 0; font-size: 0.85rem; color: #666; text-align: right;">
                         <strong>Bạn</strong> • {format_date(timestamp) if timestamp else ''}
@@ -185,12 +304,12 @@ def show_chatbot(user):
             else:
                 st.markdown(f"""
                 <div style="
-                    background: white;
+                    background: rgba(255, 255, 255, 0.95);
                     border-radius: 18px;
                     padding: 1rem 1.5rem;
                     margin: 0.5rem 0;
                     max-width: 85%;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
                 ">
                     <p style="margin: 0; font-size: 0.85rem; color: #666;">
                         <strong>🤖 AI Bác sĩ</strong> • {format_date(timestamp) if timestamp else ''}
@@ -200,6 +319,8 @@ def show_chatbot(user):
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+    else:
+        st.info("💬 Chưa có cuộc trò chuyện nào cho đánh giá này. Hãy bắt đầu chat phía dưới!")
     
     # Chat input
     st.markdown("---")
@@ -219,11 +340,12 @@ def show_chatbot(user):
         # Show user message
         st.markdown(f"""
         <div style="
-            background: #f1f3f4;
+            background: rgba(241, 243, 244, 0.95);
             border-radius: 18px;
             padding: 1rem 1.5rem;
             margin: 0.5rem 0 0.5rem auto;
             max-width: 80%;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
         ">
             <p style="margin: 0; color: #202124;">
                 {user_message}
@@ -235,11 +357,11 @@ def show_chatbot(user):
         typing_placeholder = st.empty()
         typing_placeholder.markdown("""
         <div style="
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 18px;
             padding: 1rem 1.5rem;
             max-width: 100px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         ">
             <div style="display: flex; gap: 5px;">
                 <span style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: wave 1.3s ease-in-out infinite;"></span>
@@ -247,12 +369,6 @@ def show_chatbot(user):
                 <span style="width: 8px; height: 8px; background: #667eea; border-radius: 50%; animation: wave 1.3s ease-in-out 0.4s infinite;"></span>
             </div>
         </div>
-        <style>
-            @keyframes wave {{
-                0%, 60%, 100% {{ transform: translateY(0); }}
-                30% {{ transform: translateY(-10px); }}
-            }}
-        </style>
         """, unsafe_allow_html=True)
         
         # Send message
