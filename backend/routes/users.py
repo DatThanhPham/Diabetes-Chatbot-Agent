@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, set_refresh_cookies, unset_jwt_cookies
 from services.user_service import create_user, validate_user, get_user_by_id
 
 bp = Blueprint('users', __name__, url_prefix='/api/users')
@@ -46,12 +46,17 @@ def login():
         user = validate_user(name, password)
         access_token = create_access_token(identity=user["id"])
         refresh_token = create_refresh_token(identity=user["id"])
-        return jsonify({
+        
+        response = jsonify({
             "access_token": access_token,
             "refresh_token": refresh_token,
             "user": user, 
             "message": "Login successful"
-        }), 200
+        })
+        
+        set_refresh_cookies(response, refresh_token)
+        
+        return response, 200
         
     except ValueError as e:
         return jsonify({"error": str(e)}), 401
@@ -70,8 +75,28 @@ def get_user(user_id):
         return jsonify({"error": str(e)}), 500
    
 @bp.post("/refresh")    
-@jwt_required(refresh=True)
+@jwt_required(refresh=True, locations=["cookies"])
 def refresh_access_token():
-    current_user_id = get_jwt_identity()
-    new_access_token = create_access_token(identity=current_user_id)
-    return jsonify({"access_token": new_access_token}), 200    
+    user_id = get_jwt_identity()
+    new_access_token = create_access_token(identity=user_id)
+    
+    return jsonify({"access_token": new_access_token}), 200
+
+@bp.get("/me")
+@jwt_required()
+def me():
+    user_id = get_jwt_identity()
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    return jsonify({
+        "id": str(user["id"]),
+        "name": user["name"]
+    }), 200
+
+@bp.post("/logout")
+def logout():
+    response = jsonify({"message": "Logged out"})
+    unset_jwt_cookies(response)  
+    return response, 200

@@ -26,7 +26,6 @@ class APIClient:
             # logout / clear token
             self.session.headers.pop('Authorization', None)
 
-    
     def post(self, endpoint, data=None, json=None):
         """POST request"""
         url = f"{self.base_url}{endpoint}"

@@ -52,6 +52,33 @@ def login_user(username, password):
     except Exception as e:
         return {'success': False, 'error': str(e)}
     
+def get_current_user():
+    try:
+        response = api_client.get('/users/me')
+        return api_client.handle_response(response)
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    
+def refresh_access_token():
+    try:
+        response = api_client.post('/users/refresh')
+        result = api_client.handle_response(response)
+        
+        if result.get('success'):
+            new_access = result['data'].get('access_token')
+            if new_access:
+                api_client.set_auth_token(new_access)
+            return {'success': True, 'access_token': new_access}
+        else:
+            return result
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
 def logout_user():
+    try:
+        response = api_client.post('/users/logout')
+    except Exception:
+        pass
+
     api_client.set_auth_token(None)
     return {'success': True}
