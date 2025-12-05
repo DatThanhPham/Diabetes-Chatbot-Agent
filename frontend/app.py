@@ -19,6 +19,7 @@ from views.dashboard import show_dashboard
 from views.chatbot import show_chatbot
 from views.assessment_form import show_assessment_form
 from views.history import show_history
+from views.general import show_visualize
 
 # Background image helper
 def get_base64_of_image(img_path: str) -> str:
@@ -181,6 +182,7 @@ def main():
         
         # Menu navigation with buttons
         menu_pages = {
+            "Tổng quan": "📈",
             "Dashboard": "📊",
             "Đánh giá mới": "📝",
             "Chatbot AI": "💬",
@@ -221,7 +223,9 @@ def main():
     # Route to correct page
     current_page = st.session_state.current_page
     
-    if current_page == "Dashboard":
+    if current_page == "Tổng quan":
+        show_visualize(user)
+    elif current_page == "Dashboard":
         show_dashboard(user)
     elif current_page == "Đánh giá mới":
         show_assessment_form(user)
