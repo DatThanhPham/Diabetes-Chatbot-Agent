@@ -145,11 +145,6 @@ def main():
         return
     
     user = get_user()
-
-    # user = {
-    #     "id": "692c1c7b48e77a615327f0df",
-    #     "name": "Nguyễn Văn A",
-    # }
     
     # Sidebar
     with st.sidebar:
