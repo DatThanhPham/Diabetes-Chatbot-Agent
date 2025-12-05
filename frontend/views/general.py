@@ -137,7 +137,7 @@ def show_feature_vs_sex_chart(df: pd.DataFrame, numeric_cols: list[str]):
         st.warning("Không có dữ liệu phù hợp để vẽ biểu đồ")
         return
 
-    fig_line, ax_line = plt.subplots(figsize=(7, 3))
+    fig_line, ax_line = plt.subplots(figsize=(6, 3), dpi=150)
     color_map = {
         "Nam": "#ff6b6b",
         "Nữ": "#f9c74f",
@@ -162,7 +162,8 @@ def show_feature_vs_sex_chart(df: pd.DataFrame, numeric_cols: list[str]):
     ax_line.grid(True)
     ax_line.legend(title="Giới tính")
 
-    st.pyplot(fig_line)
+    st.pyplot(fig_line, use_container_width=False)
+    plt.close(fig_line)
 
 
 # ------------------------------------------------------------
@@ -255,117 +256,121 @@ def show_visualize(user: dict | None = None):
                     st.pyplot(fig_hist, use_container_width=False)
 
     # 4. Pie chart cho các thuộc tính phân loại
-    st.subheader("Biểu đồ tròn cho các thuộc tính phân loại")
-    categorical_cols = [c for c in df.columns if c not in numeric_plot_cols]
+    with st.container():
+        st.subheader("Biểu đồ tròn cho các thuộc tính phân loại")
+        categorical_cols = [c for c in df.columns if c not in numeric_plot_cols]
 
-    if len(categorical_cols) == 0:
-        st.warning("Không có thuộc tính phân loại nào trong dữ liệu.")
-    else:
-        base_colors = ["#ff6b6b", "#1f9a00"]
+        if len(categorical_cols) == 0:
+            st.warning("Không có thuộc tính phân loại nào trong dữ liệu.")
+        else:
+            base_colors = ["#ff6b6b", "#1f9a00"]
 
-        def plot_cat_pie(ax, col_name):
-            value_counts = df[col_name].value_counts(dropna=False)
-            if value_counts.empty:
-                ax.text(0.5, 0.5, "Không có dữ liệu",
-                        ha="center", va="center", fontsize=7)
-                ax.axis("off")
-                return
+            def plot_cat_pie(col_name: str):
+                value_counts = df[col_name].value_counts(dropna=False)
+                if value_counts.empty:
+                    return None
 
-            sizes = value_counts.values
-            if len(sizes) <= 2:
-                colors_to_use = base_colors[:len(sizes)]
-            else:
-                colors_to_use = (base_colors * ((len(sizes) + 1) // 2))[:len(sizes)]
+                sizes = value_counts.values
+                if len(sizes) <= 2:
+                    colors_to_use = base_colors[:len(sizes)]
+                else:
+                    colors_to_use = (base_colors * ((len(sizes) + 1) // 2))[:len(sizes)]
 
-            wedges, texts, autotexts = ax.pie(
-                sizes,
-                labels=None,
-                startangle=90,
-                autopct="%1.1f%%",
-                pctdistance=1.20,
-                colors=colors_to_use,
-                wedgeprops={"edgecolor": "black"},
-                textprops={"fontsize": 7},
+                fig, ax = plt.subplots(figsize=(3.0, 3.0), dpi=160)
+                fig.patch.set_alpha(0.0)
+                ax.set_facecolor("none")
+
+                wedges, texts, autotexts = ax.pie(
+                    sizes,
+                    labels=value_counts.index.astype(str),
+                    startangle=90,
+                    autopct="%1.1f%%",
+                    pctdistance=0.8,
+                    colors=colors_to_use,
+                    wedgeprops={"edgecolor": "white"},
+                    textprops={"fontsize": 8},
+                )
+                for t in autotexts:
+                    t.set_ha("center")
+                    t.set_va("center")
+
+                ax.axis("equal")
+                ax.set_title(col_name, fontsize=11, pad=8)
+                return fig
+
+            # 👉 Mỗi cột phân loại = 1 dòng, pie nằm giữa
+            for col_name in categorical_cols:
+                center_col = st.columns([1, 2, 1])[1]
+                with center_col:
+                    fig = plot_cat_pie(col_name)
+                    if fig is not None:
+                        st.pyplot(fig, use_container_width=False)
+                        plt.close(fig)
+
+            # Legend chung
+            labels_legend = ["Có tiểu đường", "Không tiểu đường"]
+            colors = ["#ff6b6b", "#1f9a00"]
+
+            handles = [
+                mpatches.Patch(color=c, label=l)
+                for c, l in zip(colors, labels_legend)
+            ]
+
+            fig_leg, ax_leg = plt.subplots(figsize=(3, 0.8), dpi=160)
+            fig_leg.patch.set_alpha(0.0)
+            ax_leg.axis("off")
+            ax_leg.legend(
+                handles=handles,
+                loc="center",
+                ncol=2,
+                frameon=False,
+                fontsize=8,
             )
-            for t in autotexts:
-                t.set_ha("center")
-                t.set_va("center")
-            ax.axis("equal")
-            ax.set_title(col_name, fontsize=9, y=1.10)
+            fig_leg.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+            st.pyplot(fig_leg, use_container_width=False)
+            plt.close(fig_leg)
 
-        for i in range(0, len(categorical_cols), 2):
-            cols_pair = categorical_cols[i:i + 2]
-            n = len(cols_pair)
-
-            fig, axes = plt.subplots(
-                1,
-                n,
-                figsize=(3.0 * n, 2.4),
-                dpi=200,
-            )
-
-            if n == 1:
-                axes = [axes]
-
-            for ax, col_name in zip(axes, cols_pair):
-                plot_cat_pie(ax, col_name)
-
-            fig.subplots_adjust(
-                left=0.05,
-                right=0.95,
-                top=0.85,
-                bottom=0.10,
-                wspace=0.4,
-            )
-
-            st.pyplot(fig, use_container_width=False)
-            plt.close(fig)
-
-        labels_legend = ["Có tiểu đường", "Không tiểu đường"]
-        colors = ["#ff6b6b", "#1f9a00"]
-
-        handles = [
-            mpatches.Patch(color=c, label=l)
-            for c, l in zip(colors, labels_legend)
-        ]
-
-        fig_leg, ax_leg = plt.subplots(figsize=(2.0, 0.5), dpi=180)
-        ax_leg.axis("off")
-        ax_leg.legend(
-            handles=handles,
-            loc="center",
-            ncol=2,
-            frameon=False,
-            fontsize=8,
-        )
-        fig_leg.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
-        st.pyplot(fig_leg, use_container_width=False)
-        plt.close(fig_leg)
 
     # 5. Ma trận tương quan (CACHE)
-    st.subheader("Ma trận tương quan giữa các feature và Diabetes")
-    corr = compute_corr(df, numeric_cols)
-    cols = [target_col] + [c for c in corr.columns if c != target_col]
-    corr = corr.loc[cols, cols]
+    with st.container():
+        st.subheader("Ma trận tương quan giữa các feature và Diabetes")
+        corr = compute_corr(df, numeric_cols)
+        cols = [target_col] + [c for c in corr.columns if c != target_col]
+        corr = corr.loc[cols, cols]
 
-    fig_corr, ax_corr = plt.subplots(
-        figsize=(1.0 * len(cols) + 2, 1.0 * len(cols) + 2),
-    )
-    sns.heatmap(
-        corr,
-        annot=True,
-        fmt=".2f",
-        vmin=-1,
-        vmax=1,
-        cmap="coolwarm",
-        square=True,
-        cbar=True,
-        ax=ax_corr,
-    )
-    ax_corr.set_title("Biểu đồ nhiệt ma trận tương quan các feature và Diabetes")
-    ax_corr.set_xlabel("Feature")
-    ax_corr.set_ylabel("Feature")
-    st.pyplot(fig_corr)
+        n = len(cols)
+        # Giảm kích thước + tăng dpi cho nét
+        fig_corr, ax_corr = plt.subplots(
+            figsize=(min(0.5 * n + 2, 8), min(0.5 * n + 2, 6)),
+            dpi=160,
+        )
+        fig_corr.patch.set_alpha(0.0)
+        ax_corr.set_facecolor("none")
+
+        # Nếu quá nhiều cột thì tắt annot cho đỡ rối
+        show_annot = n <= 15
+
+        sns.heatmap(
+            corr,
+            annot=show_annot,
+            annot_kws={"size": 7} if show_annot else None,
+            fmt=".2f",
+            vmin=-1,
+            vmax=1,
+            cmap="coolwarm",
+            square=True,
+            cbar=True,
+            ax=ax_corr,
+        )
+        ax_corr.set_title("Biểu đồ nhiệt ma trận tương quan các feature và Diabetes", fontsize=11, pad=8)
+        ax_corr.set_xlabel("Feature")
+        ax_corr.set_ylabel("Feature")
+        for spine in ax_corr.spines.values():
+            spine.set_visible(False)
+
+        plt.tight_layout()
+        st.pyplot(fig_corr, use_container_width=False)
+        plt.close(fig_corr)
 
     # 6. Chọn top feature tương quan
     st.subheader("Chọn các feature có tương quan cao với Diabetes")
@@ -392,130 +397,145 @@ def show_visualize(user: dict | None = None):
     st.dataframe(result_df)
 
     # 7. Biểu đồ pie tỉ lệ tiểu đường theo giới (CACHE)
-    st.subheader("Biểu đồ tròn tỉ lệ mắc bệnh tiểu đường theo giới tính")
+    with st.container():
+        st.subheader("Biểu đồ tròn tỉ lệ mắc bệnh tiểu đường theo giới tính")
 
-    required_cols = {"Diabetes", "Sex"}
-    if not required_cols.issubset(df.columns):
-        missing = required_cols.difference(df.columns)
-        st.error(f"Thiếu các cột cần thiết cho biểu đồ: {missing}")
-    else:
-        counts = agg_sex_diabetes(df)
-        labels_legend = ["Có tiểu đường", "Không tiểu đường"]
-        colors = ["#ff6b6b", "#1f9a00"]
-
-        def get_sizes_for_sex(sex_label: str):
-            data_sex = counts[counts["SexLabel"] == sex_label]
-            if data_sex.empty:
-                return None
-            sizes = []
-            for d in [1, 0]:
-                val = data_sex.loc[data_sex["Diabetes"] == d, "Count"]
-                sizes.append(int(val.iloc[0]) if not val.empty else 0)
-            return sizes
-
-        fig, axes = plt.subplots(
-            1,
-            2,
-            figsize=(3.0, 1.5),
-            dpi=300,
-        )
-
-        sizes_male = get_sizes_for_sex("Nam")
-        if sizes_male is not None:
-            axes[0].pie(
-                sizes_male,
-                labels=None,
-                startangle=90,
-                colors=colors,
-                autopct="%1.1f%%",
-                pctdistance=0.7,
-                textprops={"fontsize": 7},
-            )
-            axes[0].axis("equal")
-            axes[0].set_title("Nam", fontsize=9, pad=1)
+        required_cols = {"Diabetes", "Sex"}
+        if not required_cols.issubset(df.columns):
+            missing = required_cols.difference(df.columns)
+            st.error(f"Thiếu các cột cần thiết cho biểu đồ: {missing}")
         else:
-            axes[0].text(0.5, 0.5, "Không có dữ liệu",
-                            ha="center", va="center", fontsize=7)
-            axes[0].axis("off")
+            counts = agg_sex_diabetes(df)
+            labels_legend = ["Có tiểu đường", "Không tiểu đường"]
+            colors = ["#ff6b6b", "#1f9a00"]
 
-        sizes_female = get_sizes_for_sex("Nữ")
-        if sizes_female is not None:
-            axes[1].pie(
-                sizes_female,
-                labels=None,
-                startangle=90,
-                colors=colors,
-                autopct="%1.1f%%",
-                pctdistance=0.7,
-                textprops={"fontsize": 7},
+            def get_sizes_for_sex(sex_label: str):
+                data_sex = counts[counts["SexLabel"] == sex_label]
+                if data_sex.empty:
+                    return None
+                sizes = []
+                for d in [1, 0]:
+                    val = data_sex.loc[data_sex["Diabetes"] == d, "Count"]
+                    sizes.append(int(val.iloc[0]) if not val.empty else 0)
+                return sizes
+
+            fig, axes = plt.subplots(
+                1,
+                2,
+                figsize=(5, 2.4),   # nhỏ hơn
+                dpi=160,
             )
-            axes[1].axis("equal")
-            axes[1].set_title("Nữ", fontsize=9, pad=1)
-        else:
-            axes[1].text(0.5, 0.5, "Không có dữ liệu",
-                            ha="center", va="center", fontsize=7)
-            axes[1].axis("off")
+            fig.patch.set_alpha(0.0)
 
-        fig.subplots_adjust(
-            left=0.02,
-            right=0.98,
-            top=0.88,
-            bottom=0.05,
-            wspace=0.3,
-        )
-        st.pyplot(fig, use_container_width=False)
+            # Nam
+            sizes_male = get_sizes_for_sex("Nam")
+            if sizes_male is not None:
+                axes[0].pie(
+                    sizes_male,
+                    labels=None,
+                    startangle=90,
+                    colors=colors,
+                    autopct="%1.1f%%",
+                    pctdistance=0.7,
+                    textprops={"fontsize": 8},
+                )
+                axes[0].axis("equal")
+                axes[0].set_title("Nam", fontsize=10, pad=2)
+            else:
+                axes[0].text(0.5, 0.5, "Không có dữ liệu",
+                             ha="center", va="center", fontsize=8)
+                axes[0].axis("off")
 
-        handles = [
-            mpatches.Patch(color=c, label=l)
-            for c, l in zip(colors, labels_legend)
-        ]
+            # Nữ
+            sizes_female = get_sizes_for_sex("Nữ")
+            if sizes_female is not None:
+                axes[1].pie(
+                    sizes_female,
+                    labels=None,
+                    startangle=90,
+                    colors=colors,
+                    autopct="%1.1f%%",
+                    pctdistance=0.7,
+                    textprops={"fontsize": 8},
+                )
+                axes[1].axis("equal")
+                axes[1].set_title("Nữ", fontsize=10, pad=2)
+            else:
+                axes[1].text(0.5, 0.5, "Không có dữ liệu",
+                             ha="center", va="center", fontsize=8)
+                axes[1].axis("off")
 
-        fig_leg, ax_leg = plt.subplots(figsize=(2.2, 0.5), dpi=300)
-        ax_leg.axis("off")
-        ax_leg.legend(
-            handles=handles,
-            loc="center",
-            ncol=2,
-            frameon=False,
-            fontsize=8,
-        )
-        fig_leg.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
-        st.pyplot(fig_leg, use_container_width=False)
+            fig.subplots_adjust(
+                left=0.08,
+                right=0.92,
+                top=0.88,
+                bottom=0.15,
+                wspace=0.3,
+            )
+            st.pyplot(fig, use_container_width=False)
+            plt.close(fig)
+
+            handles = [
+                mpatches.Patch(color=c, label=l)
+                for c, l in zip(colors, labels_legend)
+            ]
+
+            fig_leg, ax_leg = plt.subplots(figsize=(3, 0.8), dpi=160)
+            fig_leg.patch.set_alpha(0.0)
+            ax_leg.axis("off")
+            ax_leg.legend(
+                handles=handles,
+                loc="center",
+                ncol=2,
+                frameon=False,
+                fontsize=8,
+            )
+            fig_leg.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+            st.pyplot(fig_leg, use_container_width=False)
+            plt.close(fig_leg)
+
 
     # 8. Biểu đồ đường Diabetes theo độ tuổi & giới (CACHE)
-    st.subheader("Biểu đồ đường cho tỉ lệ mắc bệnh tiểu đường theo độ tuổi và giới tính")
+    with st.container():
+        st.subheader("Biểu đồ đường cho tỉ lệ mắc bệnh tiểu đường theo độ tuổi và giới tính")
 
-    required_cols_age = {"Diabetes", "Age", "Sex"}
-    if not required_cols_age.issubset(df.columns):
-        missing = required_cols_age.difference(df.columns)
-        st.error(f"Thiếu các cột cần thiết cho biểu đồ: {missing}")
-    else:
-        pivot_df = agg_age_sex_diabetes(df)
+        required_cols_age = {"Diabetes", "Age", "Sex"}
+        if not required_cols_age.issubset(df.columns):
+            missing = required_cols_age.difference(df.columns)
+            st.error(f"Thiếu các cột cần thiết cho biểu đồ: {missing}")
+        else:
+            pivot_df = agg_age_sex_diabetes(df)
 
-        fig_line, ax_line = plt.subplots(figsize=(7, 3))
-        color_map = {
-            "Nam": "#ff6b6b",
-            "Nữ": "#f9c74f",
-        }
+            fig_line, ax_line = plt.subplots(figsize=(6, 3), dpi=150)
+            fig_line.patch.set_alpha(0.0)
+            ax_line.set_facecolor("none")
 
-        for sex_value in pivot_df.columns:
-            ax_line.plot(
-                pivot_df.index,
-                pivot_df[sex_value],
-                marker="o",
-                label=f"Giới tính {sex_value}",
-                color=color_map.get(sex_value, "#ffffff"),
-            )
+            color_map = {
+                "Nam": "#ff6b6b",
+                "Nữ": "#f9c74f",
+            }
 
-        ax_line.set_xlabel("Độ tuổi")
-        ax_line.set_ylabel("Tỉ lệ mắc bệnh tiểu đường (%)")
-        ax_line.set_title("Tỉ lệ mắc bệnh tiểu đường theo độ tuổi và giới tính")
+            for sex_value in pivot_df.columns:
+                ax_line.plot(
+                    pivot_df.index,
+                    pivot_df[sex_value],
+                    marker="o",
+                    label=f"Giới tính {sex_value}",
+                    color=color_map.get(sex_value, "#ffffff"),
+                )
 
-        ax_line.yaxis.set_major_formatter(PercentFormatter(xmax=100))
-        ax_line.grid(True)
-        ax_line.legend(title="Giới tính")
+            ax_line.set_xlabel("Độ tuổi")
+            ax_line.set_ylabel("Tỉ lệ mắc bệnh tiểu đường (%)")
+            ax_line.set_title("Tỉ lệ mắc bệnh tiểu đường theo độ tuổi và giới tính")
 
-        st.pyplot(fig_line)
+            ax_line.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+            ax_line.grid(True, alpha=0.3)
+            ax_line.legend(title="Giới tính", fontsize=8)
+
+            plt.tight_layout()
+            st.pyplot(fig_line, use_container_width=False)
+            plt.close(fig_line)
+
 
     # 9. Biểu đồ mối quan hệ Diabetes vs feature + Sex (FRAGMENT – selectbox)
     show_feature_vs_sex_chart(df, numeric_cols)

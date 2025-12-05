@@ -50,7 +50,6 @@ def show_risk_result_dialog(prediction_result):
             color: #666;
             margin-bottom: 1.5rem;
         ">
-            Điểm nguy cơ: <strong>{format_risk_score(risk_score)}</strong>
         </div>
         <div style="
             font-size: 1rem;
