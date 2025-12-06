@@ -224,14 +224,12 @@ def chat():
         
         # 2. Get 3 recent assessments for history
         try:
-            result = get_assessments_by_user(user_id, valid_only=False)
-            if result.get('success'):
-                assessments = result.get('data', [])
-
-                if len(assessments) > 1:
-                    history = build_history_compact(assessments, limit=3)
-                    if history:
-                        context_lines.append(f"Lịch sử 3 lần đánh giá:\n{history}")
+            assessments = get_assessments_by_user(user_id, valid_only=False)
+            print(f"Total assessments for user {user_id}: {len(assessments)}")
+            if len(assessments) > 1:
+                history = build_history_compact(assessments, limit=3)
+                if history:
+                    context_lines.append(f"Lịch sử 3 lần đánh giá:\n{history}")
         except Exception as e:
             print(f"Assessment history error: {e}")
         
