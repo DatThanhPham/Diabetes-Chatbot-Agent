@@ -7,18 +7,18 @@ pip install -r requirements.txt
 ```
 
 ## 2. Set up environment variables
-Create a `.env` file in the root directory of the project based on the provided `.env.sample` file. Update the values as needed, especially the `GOOGLE_API_KEY`.
-
+Create a `.env` file in the root directory of the project based on the provided `.env.sample` file. Update the values as needed.
+Do the same for the backend and frontend directories
 ```bash
 cp .env.sample .env
 ```
 
-## 3. Upload knowledge files
-```bash
+## 3. Start caching for knowledge files
+
+```bash 
 cd backend
-python upload_knowledge_files.py
+python start_caching.py
 ```
-Copy the generated file IDs and update the `KNOWLEDGE_FILE_IDS` variable in the `.env` file.
 
 ## 4. Run backend server
 
@@ -31,4 +31,11 @@ python run.py
 ```bash
 cd ../frontend
 streamlit run app.py
+```
+
+## IMPORTANT NOTE:  
+## 6. Stop caching process 
+```bash
+cd backend
+python stop_caching.py
 ```

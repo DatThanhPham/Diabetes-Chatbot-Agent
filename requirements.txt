@@ -18,6 +18,9 @@ flask-jwt-extended
 
 # --- Frontend (Streamlit) ---
 streamlit
+plotly>=5.17.0
+pandas>=2.0.0
+seaborn>=0.13.2
 
 # --- Shared Libraries ---
 requests

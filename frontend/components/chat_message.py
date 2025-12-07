@@ -29,7 +29,7 @@ def render_chat_message_gemini(sender_type, content, timestamp=""):
         st.markdown(f"""
         <div class="agent-message">
             <div>
-                <strong>🤖 AI Bác sĩ</strong>
+                <strong>🤖 AI Tư vấn</strong>
                 {f'<span style="color: #999; font-size: 0.85rem; margin-left: 10px;">{format_datetime(timestamp)}</span>' if timestamp else ''}
             </div>
             <div style="margin-top: 0.5rem; line-height: 1.6;">

@@ -123,7 +123,7 @@ def show_history_dialog(assessment):
                     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
                 ">
                     <p style="margin: 0; font-size: 0.85rem; color: #666;">
-                        <strong>🤖 AI Bác sĩ</strong> • {format_date(timestamp) if timestamp else ''}
+                        <strong>🤖 AI Tư vấn</strong> • {format_date(timestamp) if timestamp else ''}
                     </p>
                     <div style="margin: 0.5rem 0 0 0; color: #202124; line-height: 1.8;">
                         {content}
@@ -219,7 +219,7 @@ def show_active_chat(user, current_assessment_id, assessment):
                     box-shadow: 0 2px 8px rgba(0,0,0,0.12);
                 ">
                     <p style="margin: 0; font-size: 0.85rem; color: #666;">
-                        <strong>🤖 AI Bác sĩ</strong> • {format_date(timestamp) if timestamp else ''}
+                        <strong>🤖 AI Tư vấn</strong> • {format_date(timestamp) if timestamp else ''}
                     </p>
                     <div style="margin: 0.5rem 0 0 0; color: #202124; line-height: 1.8;">
                         {safe_content}
