@@ -9,7 +9,6 @@ MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 class DiabetesPredictor:
     def __init__(self):
         self.model = None
-        self.encoders = None
         self.scaler = None
         self.is_loaded = False
         
@@ -27,40 +26,36 @@ class DiabetesPredictor:
         self.load_resources()
 
     def load_resources(self):
-        """Load model, encoders, và scaler"""
+        """Load model và scaler"""
         try:
             print("⏳ Đang tải model và preprocessing resources...")
             
-            model_path = os.path.join(MODEL_DIR, 'stacking_ensemble_model.bin')
-            encoders_path = os.path.join(MODEL_DIR, 'label_encoders.bin')
-            scaler_path = os.path.join(MODEL_DIR, 'scaler.bin')
+            model_path = os.path.join(MODEL_DIR, 'stacking_ensemble_model_v2.bin')
+            scaler_path = os.path.join(MODEL_DIR, 'scaler_v2.bin')
             
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model not found: {model_path}")
-            if not os.path.exists(encoders_path):
-                raise FileNotFoundError(f"Encoders not found: {encoders_path}")
             if not os.path.exists(scaler_path):
                 raise FileNotFoundError(f"Scaler not found: {scaler_path}")
             
             self.model = joblib.load(model_path)
-            self.encoders = joblib.load(encoders_path)
             self.scaler = joblib.load(scaler_path)
             self.is_loaded = True
             
-            print("Model loaded successfully!")
+            print("✅ Model loaded successfully!")
             print(f"   - Model type: {type(self.model).__name__}")
             print(f"   - Features: {len(self.columns_order)}")
             print(f"   - Categorical: {len(self.categorical_cols)}")
             print(f"   - Numerical: {len(self.numerical_cols)}")
             
         except Exception as e:
-            print(f"Lỗi khi tải model: {e}")
+            print(f"❌ Lỗi khi tải model: {e}")
             self.is_loaded = False
             raise
 
     def preprocess_input(self, data):
         """
-        Preprocess input data
+        Preprocess input data theo đúng flow trong notebook
         Input: data là dictionary { 'HighBP': 1.0, 'BMI': 25.5, ... }
         """
         # 1. Tạo DataFrame và đảm bảo đúng thứ tự cột
@@ -74,23 +69,9 @@ class DiabetesPredictor:
             missing_cols = df_input.columns[df_input.isnull().any()].tolist()
             raise ValueError(f"Dữ liệu không hợp lệ ở các cột: {missing_cols}")
 
-        # 4. Label Encoding cho categorical
-        for col in self.categorical_cols:
-            if col in self.encoders:
-                encoder = self.encoders[col]
-                val = df_input.at[0, col]
-                
-                # Kiểm tra giá trị có trong classes không
-                if val not in encoder.classes_:
-                    raise ValueError(
-                        f"Giá trị '{val}' ở cột '{col}' không hợp lệ. "
-                        f"Các giá trị hợp lệ: {list(encoder.classes_)}"
-                    )
-                
-                df_input[col] = encoder.transform([val])
-
-        # 5. Standard Scaling cho numerical
-        df_input[self.numerical_cols] = self.scaler.transform(df_input[self.numerical_cols])
+        # 4. Scale numerical + categorical features
+        cols_to_scale = self.numerical_cols + self.categorical_cols
+        df_input[cols_to_scale] = self.scaler.transform(df_input[cols_to_scale])
 
         return df_input
 
@@ -112,7 +93,7 @@ class DiabetesPredictor:
             return int(prediction[0])
             
         except Exception as e:
-            print(f"Prediction error: {e}")
+            print(f"❌ Prediction error: {e}")
             raise
     
     def predict_proba(self, form_data):
@@ -140,7 +121,7 @@ class DiabetesPredictor:
                     "high_risk": 1.0 if prediction == 1 else 0.0
                 }
         except Exception as e:
-            print(f"Probability error: {e}")
+            print(f"❌ Probability error: {e}")
             raise
     
     def get_model_info(self):
@@ -157,7 +138,7 @@ class DiabetesPredictor:
 # Tạo instance toàn cục
 try:
     predictor = DiabetesPredictor()
-    print("Predictor initialized successfully")
+    print("✅ Predictor initialized successfully")
 except Exception as e:
     print(f"⚠ Warning: Predictor initialization failed: {e}")
     print("⚠ Server will start but predictions may not work")
