@@ -12,27 +12,34 @@ from services.assessment_service import get_user_assessments, get_assessment_by_
 from services.chat_service import send_message, get_messages_by_assessment
 from utils.helpers import format_date, get_risk_level_info, format_risk_score
 from utils.session_state import get_current_assessment_id, set_current_assessment_id
+import markdown
+import bleach
 
-def escape_html_content(text):
-    """Escape HTML trong content nhưng giữ markdown"""
+ALLOWED_TAGS = [
+    "p", "br", "strong", "em", "ul", "ol", "li",
+    "code", "pre", "blockquote"
+]
+ALLOWED_ATTRS = {}
+
+def render_markdown_safe(text: str) -> str:
     if not text:
         return ""
-    
-    # Escape HTML entities
-    text = html.escape(text)
-    
-    # Convert markdown-style formatting to HTML
-    # Bold: **text** -> <strong>text</strong>
-    import re
-    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-    
-    # Italic: *text* -> <em>text</em>
-    text = re.sub(r'\*(.+?)\*', r'<em>\1</em>', text)
-    
-    # Line breaks
-    text = text.replace('\n', '<br>')
-    
-    return text
+
+    # markdown -> html
+    html_content = markdown.markdown(
+        text,
+        extensions=["fenced_code", "tables"]
+    )
+
+    # sanitize html
+    clean_html = bleach.clean(
+        html_content,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRS,
+        strip=True
+    )
+
+    return clean_html
 
 def get_base64_image(image_path):
     """Convert image to base64"""
@@ -70,9 +77,6 @@ def show_history_dialog(assessment):
         <h3 style="margin: 0; color: {risk_info['color']};">
             📊 Đánh giá: {risk_info['label']}
         </h3>
-        <p style="margin: 0.5rem 0 0 0; color: #666;">
-            🕐 {format_date(measured_at)} | 📊 Điểm nguy cơ: {format_risk_score(risk_score)}
-        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -91,9 +95,8 @@ def show_history_dialog(assessment):
             sender_type = msg['sender_type']
             content = msg['content']
             timestamp = msg.get('created_at', '')
-
-            safe_content = escape_html_content(content)
             
+            content = render_markdown_safe(content)
             if sender_type == 'user':
                 st.markdown(f"""
                 <div style="
@@ -108,7 +111,7 @@ def show_history_dialog(assessment):
                         <strong>Bạn</strong> • {format_date(timestamp) if timestamp else ''}
                     </p>
                     <p style="margin: 0.5rem 0 0 0; color: #202124;">
-                        {safe_content}
+                        {content}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -165,9 +168,6 @@ def show_active_chat(user, current_assessment_id, assessment):
         <h3 style="margin: 0; color: {risk_info['color']};">
             📊 Đánh giá hiện tại: {risk_info['label']}
         </h3>
-        <p style="margin: 0.5rem 0 0 0; color: #666;">
-            🕐 {format_date(measured_at)} | 📊 Điểm nguy cơ: {format_risk_score(risk_score)}
-        </p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -188,7 +188,7 @@ def show_active_chat(user, current_assessment_id, assessment):
             content = msg['content']
             timestamp = msg.get('created_at', '')
 
-            safe_content = escape_html_content(content)
+            content = render_markdown_safe(content)
             
             if sender_type == 'user':
                 st.markdown(f"""
@@ -204,7 +204,7 @@ def show_active_chat(user, current_assessment_id, assessment):
                         <strong>Bạn</strong> • {format_date(timestamp) if timestamp else ''}
                     </p>
                     <p style="margin: 0.5rem 0 0 0; color: #202124;">
-                        {safe_content}
+                        {content}
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -222,7 +222,7 @@ def show_active_chat(user, current_assessment_id, assessment):
                         <strong>🤖 AI Tư vấn</strong> • {format_date(timestamp) if timestamp else ''}
                     </p>
                     <div style="margin: 0.5rem 0 0 0; color: #202124; line-height: 1.8;">
-                        {safe_content}
+                        {content}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -400,8 +400,6 @@ def show_chatbot(user):
                     streamed_text += char
                     
                     if i % 10 == 0 or i == len(advice) - 1:
-                        safe_streamed_text = escape_html_content(streamed_text)
-        
                         advice_placeholder.markdown(f"""
                         <div style="
                             background: rgba(255, 255, 255, 0.95);
@@ -410,7 +408,7 @@ def show_chatbot(user):
                             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                             line-height: 1.8;
                         ">
-                            {safe_streamed_text}
+                            {streamed_text}
                         </div>
                         """, unsafe_allow_html=True)
                         time.sleep(0.01)
@@ -460,7 +458,6 @@ def show_chatbot(user):
         current_assessment_id = valid_assessments[0]['id']
         set_current_assessment_id(current_assessment_id)
     
-    # ✅ CASE 2: Check if viewing history of another assessment
     view_history_id = st.session_state.get('view_history_assessment_id')
     
     if view_history_id and view_history_id != current_assessment_id:
