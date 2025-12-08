@@ -400,6 +400,8 @@ def show_chatbot(user):
                     streamed_text += char
                     
                     if i % 10 == 0 or i == len(advice) - 1:
+                        safe_streamed_text = escape_html_content(streamed_text)
+        
                         advice_placeholder.markdown(f"""
                         <div style="
                             background: rgba(255, 255, 255, 0.95);
@@ -408,7 +410,7 @@ def show_chatbot(user):
                             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
                             line-height: 1.8;
                         ">
-                            {streamed_text}
+                            {safe_streamed_text}
                         </div>
                         """, unsafe_allow_html=True)
                         time.sleep(0.01)
