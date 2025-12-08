@@ -139,8 +139,8 @@ def show_feature_vs_sex_chart(df: pd.DataFrame, numeric_cols: list[str]):
 
     fig_line, ax_line = plt.subplots(figsize=(6, 3), dpi=150)
     color_map = {
-        "Nam": "#ff6b6b",
-        "Nữ": "#f9c74f",
+        "Nam": "#347dc1",
+        "Nữ": "#cc6594",
     }
 
     for sex_value in pivot_df.columns:
@@ -238,7 +238,7 @@ def show_visualize(user: dict | None = None):
                         bins=30,
                         kde=False,
                         ax=ax_hist,
-                        color="#ff6b6b",
+                        color="#f98125",
                     )
                     ax_hist.set_title(col, fontsize=9)
                     ax_hist.set_xlabel("")
@@ -254,7 +254,7 @@ def show_visualize(user: dict | None = None):
         if len(categorical_cols) == 0:
             st.warning("Không có thuộc tính phân loại nào trong dữ liệu.")
         else:
-            base_colors = ["#ff6b6b", "#1f9a00"]
+            base_colors = ["#f98125", "#2c599d"]
 
             def plot_cat_pie(col_name: str):
                 value_counts = df[col_name].value_counts(dropna=False)
@@ -289,10 +289,13 @@ def show_visualize(user: dict | None = None):
                 ax.set_title(col_name, fontsize=11, pad=8)
                 return fig
 
-            # 👉 Mỗi cột phân loại = 1 dòng, pie nằm giữa
-            for col_name in categorical_cols:
-                center_col = st.columns([1, 2, 1])[1]
-                with center_col:
+            # 👉 Chia làm 2 cột: mỗi bên 1 chart
+            n_cols = 2
+            for idx, col_name in enumerate(categorical_cols):
+                if idx % n_cols == 0:
+                    cols = st.columns(n_cols)  # tạo 2 cột mới cho mỗi hàng
+
+                with cols[idx % n_cols]:
                     fig = plot_cat_pie(col_name)
                     if fig is not None:
                         st.pyplot(fig, use_container_width=False)
@@ -300,7 +303,7 @@ def show_visualize(user: dict | None = None):
 
             # Legend chung
             labels_legend = ["Có tiểu đường", "Không tiểu đường"]
-            colors = ["#ff6b6b", "#1f9a00"]
+            colors = ["#f98125", "#2c599d"]
 
             handles = [
                 mpatches.Patch(color=c, label=l)
@@ -398,7 +401,7 @@ def show_visualize(user: dict | None = None):
         else:
             counts = agg_sex_diabetes(df)
             labels_legend = ["Có tiểu đường", "Không tiểu đường"]
-            colors = ["#ff6b6b", "#1f9a00"]
+            colors = ["#f98125", "#2c599d"]
             pie_labels = ["Có tiểu đường", "Không tiểu đường"]
             
             def get_sizes_for_sex(sex_label: str):
@@ -503,8 +506,8 @@ def show_visualize(user: dict | None = None):
             ax_line.set_facecolor("none")
 
             color_map = {
-                "Nam": "#ff6b6b",
-                "Nữ": "#f9c74f",
+                "Nam": "#347dc1",
+                "Nữ": "#cc6594",
             }
 
             for sex_value in pivot_df.columns:
