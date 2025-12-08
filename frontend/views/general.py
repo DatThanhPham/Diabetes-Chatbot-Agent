@@ -182,7 +182,7 @@ def show_visualize(user: dict | None = None):
     st.title("☁️ DJAT CLOUD: TRÍ TUỆ NHÂN TẠO VỀ SỨC KHỎE BỆNH TIỂU ĐƯỜNG")
 
     # 1. Chọn / tải file dữ liệu, lưu vào session
-    data_path = "./Data/merged_diabetes_dataset.csv"
+    data_path = ".././data/merged_diabetes_dataset.csv"
 
     st.info(f"Đang đọc dữ liệu từ: `{data_path}`")
 
