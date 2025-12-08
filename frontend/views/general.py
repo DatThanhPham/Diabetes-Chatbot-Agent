@@ -276,10 +276,10 @@ def show_visualize(user: dict | None = None):
                     labels=value_counts.index.astype(str),
                     startangle=90,
                     autopct="%1.1f%%",
-                    pctdistance=0.8,
+                    pctdistance=1.2,
                     colors=colors_to_use,
                     wedgeprops={"edgecolor": "white"},
-                    textprops={"fontsize": 8},
+                    textprops={"fontsize": 7},
                 )
                 for t in autotexts:
                     t.set_ha("center")
@@ -307,7 +307,7 @@ def show_visualize(user: dict | None = None):
                 for c, l in zip(colors, labels_legend)
             ]
 
-            fig_leg, ax_leg = plt.subplots(figsize=(3, 0.8), dpi=160)
+            fig_leg, ax_leg = plt.subplots(figsize=(2, 0.5), dpi=160)
             fig_leg.patch.set_alpha(0.0)
             ax_leg.axis("off")
             ax_leg.legend(
@@ -399,7 +399,8 @@ def show_visualize(user: dict | None = None):
             counts = agg_sex_diabetes(df)
             labels_legend = ["Có tiểu đường", "Không tiểu đường"]
             colors = ["#ff6b6b", "#1f9a00"]
-
+            pie_labels = ["Có tiểu đường", "Không tiểu đường"]
+            
             def get_sizes_for_sex(sex_label: str):
                 data_sex = counts[counts["SexLabel"] == sex_label]
                 if data_sex.empty:
@@ -423,11 +424,11 @@ def show_visualize(user: dict | None = None):
             if sizes_male is not None:
                 axes[0].pie(
                     sizes_male,
-                    labels=None,
+                    labels=pie_labels,  
                     startangle=90,
                     colors=colors,
                     autopct="%1.1f%%",
-                    pctdistance=0.7,
+                    pctdistance=0.6,
                     textprops={"fontsize": 8},
                 )
                 axes[0].axis("equal")
@@ -442,11 +443,11 @@ def show_visualize(user: dict | None = None):
             if sizes_female is not None:
                 axes[1].pie(
                     sizes_female,
-                    labels=None,
+                    labels=pie_labels,  
                     startangle=90,
                     colors=colors,
                     autopct="%1.1f%%",
-                    pctdistance=0.7,
+                    pctdistance=0.6,
                     textprops={"fontsize": 8},
                 )
                 axes[1].axis("equal")
