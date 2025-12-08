@@ -78,33 +78,21 @@ st.markdown(
 st.title("☁️DJAT CLOUD: TRÍ TUỆ NHÂN TẠO VỀ SỨC KHỎE BỆNH TIỂU ĐƯỜNG")
 
 # 1. Chọn file dữ liệu
-if "df" not in st.session_state:
-    st.subheader("Hãy chọn file dữ liệu")
-    st.markdown("**Chọn hoặc kéo thả file dữ liệu dạng csv vào ô bên dưới giúp mình nhé**")
-    st.markdown("**⚠️Lưu ý⚠️: File dữ liệu phải có cột `Diabetes` được mã hóa nhị phân (giá trị 0 và 1).**")
+data_path = "./Data/merged_diabetes_dataset.csv"
 
-    uploaded_file = st.file_uploader(
-        label="",
-        type=["csv"],
-        key="data_file"
+st.info(f"Đang đọc dữ liệu từ: `{data_path}`")
+
+try:
+    df = pd.read_csv(data_path)
+except FileNotFoundError:
+    st.error(
+        f"Không tìm thấy file tại đường dẫn: {data_path}\n"
+        "Hãy kiểm tra lại xem file đã tồn tại ở đúng vị trí chưa."
     )
-
-    # Nếu chưa chọn file thì dừng tại đây, chỉ hiện hướng dẫn
-    if uploaded_file is None:
-        st.stop()
-
-    # Đọc dữ liệu lần đầu rồi lưu vào session_state
-    try:
-        df = pd.read_csv(uploaded_file)
-    except Exception as e:
-        st.error(f"Lỗi khi đọc file dữ liệu csv. Chi tiết lỗi: {e}")
-        st.stop()
-
-    st.session_state["df"] = df
-    # Sau khi lưu xong, rerun để ẩn phần chọn file
-    st.rerun()
-
-df = st.session_state["df"]
+    st.stop()
+except Exception as e:
+    st.error(f"Lỗi khi đọc file dữ liệu csv. Chi tiết lỗi: {e}")
+    st.stop()
 
 numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
 
@@ -127,6 +115,7 @@ mode = st.sidebar.radio(
 # =========================
 if mode == "Tổng quan về dữ liệu":
     # Thông tin dữ liệu
+    df["Age"] = df["Age"] * 5
     st.subheader("Tổng quan dữ liệu đã nhập")
     n_rows, n_cols = df.shape
     st.write(f"Dữ liệu đưa vào gồm {n_rows} dòng và {n_cols} cột")
@@ -176,7 +165,6 @@ if mode == "Tổng quan về dữ liệu":
                         spine.set_visible(False)
 
                     st.pyplot(fig_hist, use_container_width=False)
-
 
     # Pie chart cho các thuộc tính phân loại
     st.subheader("Biểu đồ tròn cho các thuộc tính phân loại")
@@ -465,7 +453,6 @@ if mode == "Tổng quan về dữ liệu":
 
         agg["Diabetes_percent"] = agg["Diabetes_rate"] * 100
         agg = agg.sort_values("Age")
-        agg["Age"] = agg["Age"] * 5
 
         pivot_df = agg.pivot(index="Age", columns="SexLabel", values="Diabetes_percent")
 
