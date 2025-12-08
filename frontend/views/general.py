@@ -182,30 +182,21 @@ def show_visualize(user: dict | None = None):
     st.title("☁️ DJAT CLOUD: TRÍ TUỆ NHÂN TẠO VỀ SỨC KHỎE BỆNH TIỂU ĐƯỜNG")
 
     # 1. Chọn / tải file dữ liệu, lưu vào session
-    if "df" not in st.session_state:
-        st.subheader("Hãy chọn file dữ liệu")
-        st.markdown("**Chọn hoặc kéo thả file dữ liệu dạng csv vào ô bên dưới giúp mình nhé**")
-        st.markdown("**⚠️Lưu ý⚠️: File dữ liệu phải có cột `Diabetes` được mã hóa nhị phân (giá trị 0 và 1).**")
+    data_path = "./Data/merged_diabetes_dataset.csv"
 
-        uploaded_file = st.file_uploader(
-            label="",
-            type=["csv"],
-            key="data_file"
+    st.info(f"Đang đọc dữ liệu từ: `{data_path}`")
+
+    try:
+        df = pd.read_csv(data_path)
+    except FileNotFoundError:
+        st.error(
+            f"Không tìm thấy file tại đường dẫn: {data_path}\n"
+            "Hãy kiểm tra lại xem file đã tồn tại ở đúng vị trí chưa."
         )
-
-        if uploaded_file is None:
-            st.stop()
-
-        try:
-            df = pd.read_csv(uploaded_file)
-        except Exception as e:
-            st.error(f"Lỗi khi đọc file dữ liệu csv. Chi tiết lỗi: {e}")
-            st.stop()
-
-        st.session_state["df"] = df
-        st.rerun()
-
-    df: pd.DataFrame = st.session_state["df"]
+        st.stop()
+    except Exception as e:
+        st.error(f"Lỗi khi đọc file dữ liệu csv. Chi tiết lỗi: {e}")
+        st.stop()
 
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     target_col = "Diabetes"
