@@ -161,12 +161,12 @@ def chat():
         
         # Generate prompt
         if user_message is None:
-            prompt = f"BS AI tiểu đường. Tư vấn ban đầu cho bệnh nhân:\n{context}\nTrả lời ngắn gọn: 1.Kết quả 2.Rủi ro 3.Hành động 4.Ăn uống 5.Vận động 6.Khám BS. Tiếng Việt+emoji."
+            prompt = f"Trợ ý tư vấn sức khỏe:\n{context}\nTrả lời ngắn gọn: 1.Kết quả 2.Rủi ro 3.Hành động 4.Ăn uống 5.Vận động 6.Khám BS. Tiếng Việt+emoji."
             use_cache = False
         else:
             # Save user message FIRST
             create_message(assessment_id, 'user', user_message)
-            prompt = f"BS AI tiểu đường.\nContext:\n{context}\nCâu hỏi mới: {user_message}\nTrả lời dựa trên Hồ sơ + Lịch sử chat + Tài liệu y khoa (đã học). Ngắn gọn, VN+emoji."
+            prompt = f"Trợ ý tư vấn sức khỏe.\nContext:\n{context}\nCâu hỏi mới: {user_message}\nTrả lời dựa trên Hồ sơ + Lịch sử chat + Tài liệu y khoa (đã học). Ngắn gọn, VN+emoji."
             use_cache = True
         
         # Check App-level Cache
@@ -197,7 +197,7 @@ def chat():
                 
 
                 # 3. Chỉ gửi prompt (Tiết kiệm token & tiền)
-                config = {"temperature": 0.7, "max_output_tokens": 1000}
+                config = {"temperature": 0.7}
                 response = model.generate_content(prompt, generation_config=config, safety_settings=safety_settings)
                 
                 ai_response = response.text

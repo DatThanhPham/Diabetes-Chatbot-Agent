@@ -97,18 +97,18 @@ def generate_response_with_files(prompt_text, user_id=None, use_cache=True):
         
         if use_cache:
             cached = get_cached_response(prompt_text)
-            if cached: return cached
+            if cached: 
+                current_app.logger.info(f"⚡ Cache hit")
+                return cached
 
-        # 1. Tự động lấy tên cache đang chạy
         cache_name = get_active_cache_name()
         
         if not cache_name:
-            return "⚠️ Hệ thống tri thức chưa được BẬT. Vui lòng chạy file 'start_cache.py' trên server để kích hoạt."
+            return "⚠️ Hệ thống tri thức chưa được BẬT."
 
         current_app.logger.info(f"🤖 Calling Gemini via Cache: {cache_name}")
 
         try:
-            # 2. Load model TỪ CACHE 
             model = genai.GenerativeModel.from_cached_content(cached_content=cache_name)
             
             safety_settings = {
@@ -118,64 +118,69 @@ def generate_response_with_files(prompt_text, user_id=None, use_cache=True):
                 HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
 
+            # ✅ FIX: Dùng candidate_count=1 và KHÔNG SET max_output_tokens
+            # Để Gemini tự quyết định độ dài output dựa trên prompt
             generate_config = genai.types.GenerationConfig(
+                # ❌ KHÔNG SET: max_output_tokens=500,  
                 temperature=0.7,
-                top_p=0.8,
-                top_k=20
+                top_p=0.9,
+                top_k=40,
+                candidate_count=1,  # ✅ Chỉ sinh 1 candidate
             )
 
-            # 3. Generate (Chỉ gửi text prompt)
-            response = model.generate_content(prompt_text, safety_settings=safety_settings, generation_config=generate_config)
+            current_app.logger.info(f"📝 Prompt length: {len(prompt_text)} chars")
 
-             # ✅ 6. KIỂM TRA response.candidates TRƯỚC KHI truy cập .text
+            response = model.generate_content(
+                prompt_text, 
+                safety_settings=safety_settings, 
+                generation_config=generate_config
+            )
+
             if not response.candidates:
-                current_app.logger.error("❌ Response blocked by Gemini")
-                current_app.logger.error(f"Prompt feedback: {response.prompt_feedback}")
-                
-                # Log để debug
-                if hasattr(response, 'prompt_feedback'):
-                    current_app.logger.error(f"Block reason: {response.prompt_feedback.block_reason}")
-                    current_app.logger.error(f"Safety ratings: {response.prompt_feedback.safety_ratings}")
-                
-                # Trả về message thay vì crash
-                return ("Xin lỗi, hệ thống tạm thời không thể tạo lời khuyên cho trường hợp này do hạn chế về chính sách an toàn. "
-                        "Vui lòng tham khảo ý kiến bác sĩ chuyên khoa để được tư vấn chính xác nhất.")
+                current_app.logger.error(f"❌ Blocked: {response.prompt_feedback}")
+                return "Xin lỗi, hệ thống không thể tạo lời khuyên."
             
-            # ✅ 7. Kiểm tra finish_reason
             candidate = response.candidates[0]
             finish_reason = candidate.finish_reason
             
-            # finish_reason: 1=STOP (OK), 2=MAX_TOKENS, 3=SAFETY, 4=RECITATION, 5=OTHER
-            if finish_reason not in [1, 'STOP']:
-                current_app.logger.warning(f"⚠️ Finish reason: {finish_reason}")
-                if finish_reason in [3, 'SAFETY']:
-                    return ("Lời khuyên bị giới hạn do chính sách an toàn. "
-                            "Vui lòng tham khảo bác sĩ để được tư vấn chi tiết.")
+            # Mapping finish_reason
+            finish_map = {
+                0: "UNSPECIFIED",
+                1: "STOP",
+                2: "MAX_TOKENS",
+                3: "SAFETY",
+                4: "RECITATION",
+                5: "OTHER"
+            }
+            
+            finish_str = finish_map.get(finish_reason, str(finish_reason))
+            current_app.logger.info(f"🏁 Finish: {finish_str}")
+            
+            if finish_reason == 2:
+                current_app.logger.error(f"❌ MAX_TOKENS! Response may be truncated.")
+            elif finish_reason not in [1, 'STOP']:
+                current_app.logger.warning(f"⚠️ Early finish: {finish_str}")
 
-            # ✅ 8. Lấy text an toàn
             try:
                 text = response.text
             except Exception as e:
-                current_app.logger.error(f"Error getting response.text: {e}")
-                # Fallback: lấy text từ parts
+                current_app.logger.error(f"Error .text: {e}")
                 try:
                     text = candidate.content.parts[0].text
                 except:
-                    return "Xin lỗi, không thể tạo lời khuyên lúc này. Vui lòng thử lại sau."
+                    return "Xin lỗi, không thể tạo lời khuyên."
 
-
-            # Debug Token Usage (Để bạn kiểm tra tiền)
-            print("\n" + "="*30)
-            print("🔍 KIỂM TRA TOKEN USAGE:")
             if response.usage_metadata:
-                print(f"1. Tổng Token:      {response.usage_metadata.prompt_token_count}")
+                total = response.usage_metadata.prompt_token_count
                 cached_cnt = response.usage_metadata.cached_content_token_count
-                print(f"2. Token từ Cache:  {cached_cnt} (Rẻ/Free quota)")
-                fresh = response.usage_metadata.prompt_token_count - cached_cnt
-                print(f"3. Token mới:       {fresh}")
-            print("="*30 + "\n")
+                output_tokens = response.usage_metadata.candidates_token_count
+                
+                current_app.logger.info(
+                    f"📊 Tokens: prompt={total} (cache={cached_cnt}, new={total-cached_cnt}), "
+                    f"OUTPUT={output_tokens}"
+                )
             
-            text = response.text
+            current_app.logger.info(f"✅ Response: {len(text)} chars, {len(text.split())} words")
             
             if use_cache:
                 cache_response(prompt_text, text)
@@ -183,17 +188,18 @@ def generate_response_with_files(prompt_text, user_id=None, use_cache=True):
             return text
 
         except Exception as e:
-            # Xử lý lỗi nếu Cache hết hạn hoặc bị xóa
             error_msg = str(e)
+            current_app.logger.error(f"Gemini error: {error_msg}\n{traceback.format_exc()}")
+            
             if "404" in error_msg or "not found" in error_msg.lower():
-                return "⚠️ Phiên làm việc (Cache) đã hết hạn. Vui lòng chạy lại 'start_cache.py'."
+                return "⚠️ Cache hết hạn. Chạy lại 'start_cache.py'."
             if '429' in error_msg or 'Resource exhausted' in error_msg:
-                return "Hệ thống bận. Vui lòng thử lại sau 1 phút."
+                return "Hệ thống bận. Thử lại sau 1 phút."
             raise e
         
     except Exception as e:
         current_app.logger.error(f"Gemini error: {e}")
-        return "Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau."
+        return "Xin lỗi, hệ thống đang bận."    
 
 def build_profile_compact(record):
     """
@@ -331,18 +337,22 @@ def get_advice():
         })
         
         # Prompt
-        prompt = f"""Bạn là trợ lý chăm sóc sức khỏe. Dựa vào hồ sơ sau, hãy đưa ra lời khuyên:
+        prompt = f"""Bạn là trợ lý chăm sóc sức khỏe AI. Dựa vào hồ sơ bệnh nhân sau:
 
 {profile}
 
-Hãy tư vấn ngắn gọn (300 từ) về:
-- Đánh giá tình trạng
-- Điểm cần lưu ý
-- Gợi ý dinh dưỡng
-- Gợi ý vận động
-- Khi nào nên gặp bác sĩ
+YÊU CẦU: Hãy viết một bản tư vấn CHI TIẾT (ít nhất 300 từ), bao gồm:
 
-Dùng bullet points, emoji, dễ hiểu."""
+1. 📋 Đánh giá tổng quan tình trạng sức khỏe (2-3 câu)
+2. ⚠️ Các yếu tố nguy cơ cần lưu ý (3-4 điểm)
+3. 🥗 Gợi ý dinh dưỡng cụ thể (4-5 điểm với ví dụ thực phẩm)
+4. 🏃 Gợi ý vận động phù hợp (3-4 điểm với cường độ, thời lượng)
+5. 🩺 Khi nào cần gặp bác sĩ (2-3 dấu hiệu)
+6. 💡 Lời khuyên thêm (1-2 điểm)
+
+Format: Dùng bullet points, emoji, VIẾT ĐẦY ĐỦ các mục trên.
+
+BẮT ĐẦU TƯ VẤN:"""
         
         current_app.logger.info("🤖 Generating advice...")
         

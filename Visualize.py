@@ -75,7 +75,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("☁️DJAT CLOUD: TRÍ TUỆ NHÂN TẠO VỀ SỨC KHỎE BỆNH TIỂU ĐƯỜNG")
+st.title("☁️DAJTA CLOUD: TRÍ TUỆ NHÂN TẠO VỀ SỨC KHỎE BỆNH TIỂU ĐƯỜNG")
 
 # 1. Chọn file dữ liệu
 if "df" not in st.session_state:

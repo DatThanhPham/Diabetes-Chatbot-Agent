@@ -183,7 +183,7 @@ def show_auth_page():
             Hệ thống tư vấn và dự đoán nguy cơ tiểu đường
         </p>
         <p style="color: #333; font-size: 1.2rem; font-weight: bold; text-shadow: 1px 1px 2px rgba(255,255,255,0.8);">
-            Nhóm Cloud Djata
+            Nhóm Cloud Dajta
         </p>
     </div>
     """, unsafe_allow_html=True)
