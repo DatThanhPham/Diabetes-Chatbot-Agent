@@ -30,7 +30,7 @@ class APIClient:
         """POST request"""
         url = f"{self.base_url}{endpoint}"
         try:
-            response = self.session.post(url, data=data, json=json, timeout=30)
+            response = self.session.post(url, data=data, json=json, timeout=120)
             return response
         except requests.exceptions.Timeout:
             raise Exception("Request timeout - Server không phản hồi")
