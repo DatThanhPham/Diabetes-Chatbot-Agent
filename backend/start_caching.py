@@ -36,7 +36,7 @@ for f in uploaded_files:
 # 3. TẠO CACHE
 print("--> Đang tạo Cache Context...")
 cache = caching.CachedContent.create(
-    model='models/gemini-2.0-flash',
+    model='models/gemini-2.5-flash',
     display_name="diabetes_knowledge_base",
     system_instruction="Bạn là chuyên gia y tế về bệnh tiểu đường. Hãy trả lời câu hỏi dựa trên các tài liệu được cung cấp.",
     contents=uploaded_files,

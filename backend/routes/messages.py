@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.message_service import create_message, get_messages_by_assessment, delete_messages_by_assessment
 from services.assessment_service import get_assessment_by_id, get_assessments_by_user
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import time
 import hashlib
 import json  
@@ -187,10 +188,17 @@ def chat():
             try:
                 # 2. Load model TỪ CACHE (Không cần gửi file nữa)
                 model = genai.GenerativeModel.from_cached_content(cached_content=cache_name)
+                safety_settings = {
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                }
                 
+
                 # 3. Chỉ gửi prompt (Tiết kiệm token & tiền)
                 config = {"temperature": 0.7, "max_output_tokens": 1000}
-                response = model.generate_content(prompt, generation_config=config)
+                response = model.generate_content(prompt, generation_config=config, safety_settings=safety_settings)
                 
                 ai_response = response.text
                 

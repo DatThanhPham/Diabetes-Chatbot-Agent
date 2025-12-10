@@ -9,6 +9,8 @@ import google.generativeai as genai
 import traceback 
 import json
 import os
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+
 
 bp = Blueprint('app_routes', __name__, url_prefix='/api')
 
@@ -109,8 +111,58 @@ def generate_response_with_files(prompt_text, user_id=None, use_cache=True):
             # 2. Load model TỪ CACHE 
             model = genai.GenerativeModel.from_cached_content(cached_content=cache_name)
             
+            safety_settings = {
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+
+            generate_config = genai.types.GenerationConfig(
+                temperature=0.7,
+                top_p=0.8,
+                top_k=20
+            )
+
             # 3. Generate (Chỉ gửi text prompt)
-            response = model.generate_content(prompt_text)
+            response = model.generate_content(prompt_text, safety_settings=safety_settings, generation_config=generate_config)
+
+             # ✅ 6. KIỂM TRA response.candidates TRƯỚC KHI truy cập .text
+            if not response.candidates:
+                current_app.logger.error("❌ Response blocked by Gemini")
+                current_app.logger.error(f"Prompt feedback: {response.prompt_feedback}")
+                
+                # Log để debug
+                if hasattr(response, 'prompt_feedback'):
+                    current_app.logger.error(f"Block reason: {response.prompt_feedback.block_reason}")
+                    current_app.logger.error(f"Safety ratings: {response.prompt_feedback.safety_ratings}")
+                
+                # Trả về message thay vì crash
+                return ("Xin lỗi, hệ thống tạm thời không thể tạo lời khuyên cho trường hợp này do hạn chế về chính sách an toàn. "
+                        "Vui lòng tham khảo ý kiến bác sĩ chuyên khoa để được tư vấn chính xác nhất.")
+            
+            # ✅ 7. Kiểm tra finish_reason
+            candidate = response.candidates[0]
+            finish_reason = candidate.finish_reason
+            
+            # finish_reason: 1=STOP (OK), 2=MAX_TOKENS, 3=SAFETY, 4=RECITATION, 5=OTHER
+            if finish_reason not in [1, 'STOP']:
+                current_app.logger.warning(f"⚠️ Finish reason: {finish_reason}")
+                if finish_reason in [3, 'SAFETY']:
+                    return ("Lời khuyên bị giới hạn do chính sách an toàn. "
+                            "Vui lòng tham khảo bác sĩ để được tư vấn chi tiết.")
+
+            # ✅ 8. Lấy text an toàn
+            try:
+                text = response.text
+            except Exception as e:
+                current_app.logger.error(f"Error getting response.text: {e}")
+                # Fallback: lấy text từ parts
+                try:
+                    text = candidate.content.parts[0].text
+                except:
+                    return "Xin lỗi, không thể tạo lời khuyên lúc này. Vui lòng thử lại sau."
+
 
             # Debug Token Usage (Để bạn kiểm tra tiền)
             print("\n" + "="*30)
@@ -279,17 +331,18 @@ def get_advice():
         })
         
         # Prompt
-        prompt = f"""Dựa vào tài liệu cho người bệnh tiểu đường, hãy đưa ra các câu trả lời sau, thông tin: {profile}
+        prompt = f"""Bạn là trợ lý chăm sóc sức khỏe. Dựa vào hồ sơ sau, hãy đưa ra lời khuyên:
 
-⚡ Trả lời ngắn gọn, Tiếng Việt + emoji:
-- Kết quả tham khảo
-- Rủi ro chính cần chú ý
-- 3-5 hành động chăm sóc
-- Ăn uống hợp lý
-- Vận động phù hợp
-- Khi cần gặp chuyên gia
+{profile}
 
-Chỉ mang tính tham khảo, ngắn gọn, bullet points, tối đa 300 từ."""
+Hãy tư vấn ngắn gọn (300 từ) về:
+- Đánh giá tình trạng
+- Điểm cần lưu ý
+- Gợi ý dinh dưỡng
+- Gợi ý vận động
+- Khi nào nên gặp bác sĩ
+
+Dùng bullet points, emoji, dễ hiểu."""
         
         current_app.logger.info("🤖 Generating advice...")
         
