@@ -8,3 +8,25 @@ xgboost
 scikit-learn==1.5.2
 joblib
 matplotlib
+tabulate
+imbalanced-learn
+mlxtend
+# --- Backend (Flask) ---
+Flask
+python-dotenv
+flask-jwt-extended
+
+# --- Frontend (Streamlit) ---
+streamlit
+plotly>=5.17.0
+pandas>=2.0.0
+seaborn>=0.13.2
+markdown
+bleach
+
+# --- Shared Libraries ---
+requests
+google-generativeai
+
+flask-cors==4.0.0
+pymongo==4.6.1
